@@ -172,15 +172,45 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`======================================================\n`);
 });
 
-// Also bind standard HTTP port 80 so mobile devices opening http://172.16.81.207 directly without :3000 connect!
-if (Number(PORT) !== 80) {
+const { spawn, execSync } = require('node:child_process');
+
+// Auto-start Cloudflare tunnel if available
+function startCloudflareTunnel() {
+  const cfExe = path.join(__dirname, 'cloudflared.exe');
+  if (!fs.existsSync(cfExe)) return;
+
   try {
-    const server80 = http.createServer(handleRequest);
-    server80.listen(80, '0.0.0.0', () => {
-      console.log(`🌐 Standard HTTP Port 80 is also ACTIVE (http://${LAN_IP}/) for direct mobile scanning!`);
-    }).on('error', (err) => {
-      console.log(`ℹ️ Port 80 not bound (${err.message}) - running on primary port ${PORT}.`);
+    const list = execSync('tasklist', { encoding: 'utf-8' });
+    if (list.includes('cloudflared.exe')) {
+      return; // Already active
+    }
+  } catch {}
+
+  try {
+    const child = spawn(cfExe, ['tunnel', '--url', `http://localhost:${PORT}`], {
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe']
     });
+
+    let found = false;
+    const onOutput = (chunk) => {
+      const text = chunk.toString();
+      const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (match && !found) {
+        found = true;
+        const publicUrl = match[0];
+        console.log(`🌐 Live Internet Tunnel (No Wi-Fi Needed): ${publicUrl}`);
+        try {
+          db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(publicUrl, 'customer_url');
+        } catch {}
+      }
+    };
+
+    child.stdout.on('data', onOutput);
+    child.stderr.on('data', onOutput);
   } catch {}
 }
+
+startCloudflareTunnel();
+
 
