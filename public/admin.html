@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muse admin</title>
+  <link rel="icon" type="image/webp" href="/logo-96.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/index-ChRsq97C.css" />
+  <style>
+    /* 1. High-Priority Floating Table Alert Banners (Waiter & Bill Requests) */
+    #adminAlertsBannerHost {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 92%;
+      max-width: 580px;
+      pointer-events: none;
+    }
+    .admin-table-alert {
+      pointer-events: auto;
+      color: #fff;
+      border-radius: 14px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 0 1.5px rgba(255,255,255,0.15);
+      animation: alertPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .admin-table-alert.type-waiter {
+      border-left: 6px solid #f59e0b;
+      background: linear-gradient(135deg, #2e1d10 0%, #1f150e 100%);
+    }
+    .admin-table-alert.type-bill {
+      border-left: 6px solid #3b82f6;
+      background: linear-gradient(135deg, #10233f 0%, #0d1729 100%);
+    }
+    .admin-table-alert .alert-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .admin-table-alert .alert-emoji {
+      font-size: 1.9rem;
+      animation: alertRing 1.5s ease infinite;
+    }
+    .admin-table-alert .alert-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+    .admin-table-alert .alert-sub {
+      font-size: 0.82rem;
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+    .admin-table-alert .alert-ack-btn {
+      background: #fff;
+      color: #1c1511;
+      border: none;
+      border-radius: 9px;
+      padding: 8px 15px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .admin-table-alert .alert-ack-btn:hover {
+      background: #f7eee4;
+      transform: scale(1.03);
+    }
+    @keyframes alertPopIn {
+      from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes alertRing {
+      0%, 100% { transform: rotate(0); }
+      10%, 30% { transform: rotate(-15deg); }
+      20%, 40% { transform: rotate(15deg); }
+      50% { transform: rotate(0); }
+    }
+
+    </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Floating Waiter & Bill Alerts Container -->
+  <div id="adminAlertsBannerHost"></div>
+
+  <script type="module" src="/assets/index-DEbz15yT.js"></script>
+
+  <!-- UNIFIED AUDIO & REAL-TIME ALERTS ENGINE -->
+  <script>
+    (function () {
+      let audioCtx = null;
+      let lastAlertTime = 0;
+      let knownCallIds = new Set();
+      let lastReminderTime = 0;
+      let lastPulseRev = null;
+
+      function getAudioContext() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+      }
+
+      // Sync sound settings from server if not set
+      async function syncSoundSettings() {
+        try {
+          const res = await fetch('/api/admin/settings');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.sound_type && !localStorage.getItem('muse_sound_type')) {
+              localStorage.setItem('muse_sound_type', data.sound_type);
+            }
+            if (data.sound_name && !localStorage.getItem('muse_sound_name')) {
+              localStorage.setItem('muse_sound_name', data.sound_name);
+            }
+            if (data.sound_volume !== undefined && !localStorage.getItem('muse_sound_volume')) {
+              localStorage.setItem('muse_sound_volume', String(data.sound_volume));
+            }
+          }
+        } catch {}
+      }
+      syncSoundSettings();
+
+      // Universal Alert Sound Player (Plays Owner's Chosen Custom File or Preset)
+      window.playAlertSound = function (type = 'order') {
+        const now = Date.now();
+        // Debounce within 1200ms to avoid duplicate chimes
+        if (now - lastAlertTime < 1200) return;
+        lastAlertTime = now;
+
+        const soundType = localStorage.getItem('muse_sound_type') || 'bell';
+        const soundVol = parseFloat(localStorage.getItem('muse_sound_volume') || '1.0');
+        const customData = localStorage.getItem('muse_custom_sound');
+
+        // 1. Custom Device Sound
+        if (soundType === 'custom') {
+          const soundSrc = customData || '/custom-sound.audio?t=' + Date.now();
+          try {
+            const audio = new Audio(soundSrc);
+            audio.volume = Math.max(0.1, Math.min(1.0, soundVol));
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.catch(e => {
+                console.warn('Custom audio playback blocked/failed, using brass bell fallback:', e);
+                synthesizeBell(type, soundVol);
+              });
+            }
+            return;
+          } catch (e) {
+            console.warn('Error loading custom audio, using brass bell fallback:', e);
+          }
+        }
+
+        // 2. Synthesized presets using Web Audio API
+        if (soundType === 'chime') {
+          synthesizeChime(soundVol);
+        } else if (soundType === 'beep') {
+          synthesizeBeep(soundVol);
+        } else if (soundType === 'marimba') {
+          synthesizeMarimba(soundVol);
+        } else {
+          // Default: Brass Kitchen Bell
+          synthesizeBell(type, soundVol);
+        }
+      };
+
+      // Compatibility alias
+      window.playLoudKitchenBell = window.playAlertSound;
+
+      // Synthesized Brass Service Bell
+      function synthesizeBell(type, vol = 1.0) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        let strikes = [];
+
+        if (type === 'waiter') {
+          strikes = [
+            { freq: 1174.66, time: 0.0, gain: vol, decay: 1.0 },
+            { freq: 1174.66, time: 0.18, gain: vol, decay: 1.0 },
+            { freq: 1396.91, time: 0.38, gain: vol, decay: 1.6 }
+          ];
+        } else if (type === 'bill') {
+          strikes = [
+            { freq: 1318.51, time: 0.0, gain: vol, decay: 1.1 },
+            { freq: 987.77, time: 0.25, gain: vol, decay: 1.5 }
+          ];
+        } else {
+          strikes = [
+            { freq: 1046.50, time: 0.0, gain: vol, decay: 1.2 },
+            { freq: 1318.51, time: 0.24, gain: vol, decay: 1.6 }
+          ];
+        }
+
+        strikes.forEach(s => {
+          const t = now + s.time;
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(s.freq, t);
+          gain1.gain.setValueAtTime(0.0001, t);
+          gain1.gain.linearRampToValueAtTime(s.gain * 0.75, t + 0.003);
+          gain1.gain.exponentialRampToValueAtTime(0.0001, t + s.decay);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(t);
+          osc1.stop(t + s.decay + 0.05);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(s.freq * 2.76, t);
+          gain2.gain.setValueAtTime(0.0001, t);
+          gain2.gain.linearRampToValueAtTime(s.gain * 0.4, t + 0.002);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, t + (s.decay * 0.5));
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(t);
+          osc2.stop(t + (s.decay * 0.5) + 0.05);
+
+          const osc3 = ctx.createOscillator();
+          const gain3 = ctx.createGain();
+          osc3.type = 'triangle';
+          osc3.frequency.setValueAtTime(s.freq * 4.15, t);
+          gain3.gain.setValueAtTime(0.0001, t);
+          gain3.gain.linearRampToValueAtTime(s.gain * 0.3, t + 0.001);
+          gain3.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+          osc3.connect(gain3);
+          gain3.connect(ctx.destination);
+          osc3.start(t);
+          osc3.stop(t + 0.15);
+        });
+      }
+
+      function synthesizeChime(vol = 1.0) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        [
+          { f: 1318.51, t: 0, d: 0.9 },
+          { f: 987.77, t: 0.28, d: 1.4 }
+        ].forEach(n => {
+          const t = now + n.t;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(n.f, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(vol * 0.65, t + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + n.d);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + n.d + 0.05);
+        });
+      }
+
+      function synthesizeBeep(vol = 1.0) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        [880, 1320].forEach((freq, idx) => {
+          const t = now + idx * 0.12;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(vol * 0.55, t + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.25);
+        });
+      }
+
+      function synthesizeMarimba(vol = 1.0) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const t = now + idx * 0.09;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(vol * 0.5, t + 0.002);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.5);
+        });
+      }
+
+      // Automatically unlock audio context on any user interaction anywhere on the page
+      ['click', 'touchstart', 'keydown'].forEach(evt => {
+        window.addEventListener(evt, () => {
+          getAudioContext();
+        }, { once: false, passive: true });
+      });
+
+      // Format time helper
+      function formatTimeAgo(iso) {
+        try {
+          const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+          if (diffSec < 60) return diffSec + 's ago';
+          const min = Math.floor(diffSec / 60);
+          return min + 'm ago';
+        } catch {
+          return 'just now';
+        }
+      }
+
+      // Render Waiter & Bill Alerts Banner
+      function renderTableAlerts(calls) {
+        const host = document.getElementById('adminAlertsBannerHost');
+        if (!host) return;
+
+        if (!calls || !calls.length) {
+          host.innerHTML = '';
+          return;
+        }
+
+        host.innerHTML = calls.map(c => {
+          const isWaiter = c.type === 'waiter';
+          return `
+            <div class="admin-table-alert ${isWaiter ? 'type-waiter' : 'type-bill'}" data-call-id="${c.id}">
+              <div class="alert-content">
+                <div class="alert-emoji">${isWaiter ? '🔔' : '💳'}</div>
+                <div>
+                  <div class="alert-title">TABLE ${c.table_number}: ${isWaiter ? 'WAITER CALLED!' : 'BILL REQUESTED!'}</div>
+                  <div class="alert-sub">${isWaiter ? 'Guest needs assistance at Table ' + c.table_number : 'Table ' + c.table_number + ' requested their bill'} · ${formatTimeAgo(c.created_at)}</div>
+                </div>
+              </div>
+              <button type="button" class="alert-ack-btn" onclick="window.dismissWaiterCall(${c.id})">
+                ✓ ${isWaiter ? 'Attended' : 'Done'} (Dismiss)
+              </button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Dismiss Waiter Call
+      window.dismissWaiterCall = async function (id) {
+        try {
+          await fetch('/api/admin/waiter-calls/' + id + '/seen', { method: 'POST' });
+          await fetch('/api/admin/orders/call-' + id + '/seen', { method: 'POST' }).catch(() => {});
+          pollAlertsImmediately();
+        } catch (e) {
+          console.error('Error dismissing waiter call:', e);
+        }
+      };
+
+      // Poll Alerts
+      async function pollAlertsImmediately() {
+        try {
+          const res = await fetch('/api/admin/waiter-calls');
+          if (res.ok) {
+            const data = await res.json();
+            const calls = data.calls || [];
+
+            let hasNewCall = false;
+            let newestType = 'order';
+
+            calls.forEach(c => {
+              if (!knownCallIds.has(c.id)) {
+                knownCallIds.add(c.id);
+                hasNewCall = true;
+                newestType = c.type || 'waiter';
+              }
+            });
+
+            if (hasNewCall) {
+              window.playAlertSound(newestType);
+            } else if (calls.length > 0 && Date.now() - lastReminderTime > 15000) {
+              lastReminderTime = Date.now();
+              window.playAlertSound(calls[0].type || 'waiter');
+            }
+
+            renderTableAlerts(calls);
+          }
+        } catch {}
+      }
+
+      // Background Pulse Monitor (checks pulse every 1.5 seconds)
+      async function checkPulse() {
+        try {
+          const res = await fetch('/api/admin/pulse');
+          if (res.ok) {
+            const data = await res.json();
+            if (lastPulseRev === null) {
+              lastPulseRev = data.rev;
+              pollAlertsImmediately();
+            } else if (data.rev !== lastPulseRev) {
+              lastPulseRev = data.rev;
+              pollAlertsImmediately();
+            }
+          }
+        } catch {}
+      }
+
+      
+      // MANAGER AUTHORIZATION ENGINE (4-DIGIT PIN OR BIOMETRICS)
+      window.askManagerAuth = function (actionTitle = 'Perform Protected Action') {
+        return new Promise((resolve) => {
+          const existing = document.getElementById('managerAuthModalOverlay');
+          if (existing) existing.remove();
+
+          const hasBio = typeof window !== 'undefined' && window.PublicKeyCredential;
+
+          const overlay = document.createElement('div');
+          overlay.id = 'managerAuthModalOverlay';
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,15,10,0.65);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+          overlay.innerHTML = `
+            <div style="background:#ffffff;border-radius:20px;max-width:380px;width:100%;padding:24px 20px;box-shadow:0 24px 48px rgba(0,0,0,0.3);text-align:center;font-family:system-ui,-apple-system,sans-serif;color:#2b1f16;position:relative;">
+              <div style="width:52px;height:52px;background:#fef3c7;border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 12px;">🔒</div>
+              <h2 style="font-size:1.25rem;font-weight:700;margin:0 0 6px;color:#1c1917;">Manager Authorization</h2>
+              <p style="font-size:0.88rem;color:#78716c;margin:0 0 16px;">Action: <strong style="color:#b91c1c;">${actionTitle}</strong></p>
+
+              ${hasBio ? `
+                <button type="button" id="authBioBtn" style="width:100%;background:#166534;color:#fff;border:none;border-radius:12px;padding:12px;font-size:0.95rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:14px;box-shadow:0 2px 8px rgba(22,101,52,0.3);">
+                  <span>👆</span> Verify with Fingerprint / Face ID
+                </button>
+                <div style="font-size:0.78rem;color:#a8a29e;margin-bottom:12px;">— OR ENTER 4-DIGIT PIN —</div>
+              ` : ''}
+
+              <div style="margin-bottom:14px;">
+                <input type="password" id="authPinInput" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="••••" autocomplete="off" style="width:140px;height:46px;text-align:center;font-size:1.6rem;letter-spacing:10px;border:2px solid #d6d3d1;border-radius:12px;outline:none;background:#fafaf9;color:#292524;" />
+                <div id="authErrMsg" style="font-size:0.82rem;color:#dc2626;min-height:18px;margin-top:6px;font-weight:600;"></div>
+              </div>
+
+              <!-- Quick Number Pad for Touch/Tablet -->
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto 16px;">
+                ${[1,2,3,4,5,6,7,8,9,'C',0,'⌫'].map(k => `
+                  <button type="button" class="auth-key-btn" data-key="${k}" style="height:40px;border:1px solid #e7e5e4;background:#f5f5f4;border-radius:8px;font-size:1.1rem;font-weight:600;cursor:pointer;color:#292524;">${k}</button>
+                `).join('')}
+              </div>
+
+              <div style="display:flex;gap:10px;justify-content:center;">
+                <button type="button" id="authCancelBtn" style="flex:1;background:#f5f5f4;border:1px solid #d6d3d1;border-radius:10px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;color:#57534e;">Cancel</button>
+                <button type="button" id="authConfirmBtn" style="flex:1;background:#b91c1c;border:none;border-radius:10px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;color:#ffffff;">Authorize</button>
+              </div>
+            </div>
+          `;
+
+          document.body.appendChild(overlay);
+
+          const pinInput = document.getElementById('authPinInput');
+          const errMsg = document.getElementById('authErrMsg');
+          const cancelBtn = document.getElementById('authCancelBtn');
+          const confirmBtn = document.getElementById('authConfirmBtn');
+          const bioBtn = document.getElementById('authBioBtn');
+
+          if (pinInput) pinInput.focus();
+
+          const cleanup = (result) => {
+            overlay.remove();
+            resolve(result);
+          };
+
+          cancelBtn.addEventListener('click', () => cleanup(false));
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) cleanup(false);
+          });
+
+          // Keypad Handler
+          overlay.querySelectorAll('.auth-key-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const k = btn.dataset.key;
+              if (k === 'C') {
+                pinInput.value = '';
+              } else if (k === '⌫') {
+                pinInput.value = pinInput.value.slice(0, -1);
+              } else if (pinInput.value.length < 4) {
+                pinInput.value += k;
+              }
+              errMsg.textContent = '';
+              if (pinInput.value.length === 4) {
+                verifyPin();
+              }
+            });
+          });
+
+          pinInput.addEventListener('input', () => {
+            errMsg.textContent = '';
+            if (pinInput.value.length === 4) {
+              verifyPin();
+            }
+          });
+
+          pinInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') verifyPin();
+            if (e.key === 'Escape') cleanup(false);
+          });
+
+          confirmBtn.addEventListener('click', () => verifyPin());
+
+          // Verify PIN with server
+          async function verifyPin() {
+            const val = pinInput.value.trim();
+            if (val.length < 4) {
+              errMsg.textContent = 'Please enter all 4 digits.';
+              return;
+            }
+            try {
+              confirmBtn.disabled = true;
+              confirmBtn.textContent = 'Verifying…';
+              const res = await fetch('/api/admin/verify-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin: val })
+              });
+              if (res.ok) {
+                cleanup(true);
+              } else {
+                const errData = await res.json().catch(() => ({}));
+                errMsg.textContent = errData.error || '❌ Incorrect PIN';
+                pinInput.value = '';
+                pinInput.focus();
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Authorize';
+              }
+            } catch (err) {
+              errMsg.textContent = 'Network error. Try again.';
+              confirmBtn.disabled = false;
+              confirmBtn.textContent = 'Authorize';
+            }
+          }
+
+          // Biometric Verification Handler
+          if (bioBtn) {
+            bioBtn.addEventListener('click', async () => {
+              try {
+                bioBtn.disabled = true;
+                bioBtn.textContent = 'Scanning biometrics…';
+                const chall = new Uint8Array(32);
+                window.crypto.getRandomValues(chall);
+                const credId = localStorage.getItem('muse_biometric_id');
+                const opt = {
+                  publicKey: {
+                    challenge: chall,
+                    userVerification: 'preferred',
+                    timeout: 60000
+                  }
+                };
+                if (credId) {
+                  try {
+                    const bin = atob(credId);
+                    const arr = new Uint8Array(bin.length);
+                    for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+                    opt.publicKey.allowCredentials = [{ type: 'public-key', id: arr }];
+                  } catch {}
+                }
+                const assertion = await navigator.credentials.get(opt);
+                if (assertion) {
+                  cleanup(true);
+                  return;
+                }
+              } catch (err) {
+                errMsg.textContent = err.name === 'NotAllowedError' ? 'Scan canceled.' : 'Biometrics failed: ' + err.message;
+              } finally {
+                bioBtn.disabled = false;
+                bioBtn.innerHTML = '<span>👆</span> Verify with Fingerprint / Face ID';
+              }
+            });
+          }
+        });
+      };
+
+      // Start polling
+      setInterval(checkPulse, 1500);
+      setInterval(pollAlertsImmediately, 4000);
+    })();
+  </script>
+</body>
+</html>

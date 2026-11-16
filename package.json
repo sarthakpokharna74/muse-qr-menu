@@ -1,0 +1,24 @@
+{
+  "name": "muse-qr-menu-system",
+  "version": "1.0.0",
+  "description": "Artisanal QR Code Menu & Table Ordering System with Live Manager Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "keywords": [
+    "qr-menu",
+    "restaurant-pos",
+    "table-ordering",
+    "loyalty-points"
+  ],
+  "author": "Antigravity",
+  "license": "ISC",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}

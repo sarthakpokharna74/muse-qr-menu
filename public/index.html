@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muse Bread & Brew · QR Menu & Ordering System</title>
+  <link rel="icon" type="image/webp" href="/logo-96.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/index-ChRsq97C.css" />
+  <style>
+    body {
+      background: var(--cream);
+      color: var(--espresso);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px;
+    }
+    .hub-container {
+      max-width: 640px;
+      width: 100%;
+    }
+    .hub-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .hub-logo {
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px var(--gold);
+      margin-bottom: 12px;
+    }
+    .hub-title {
+      font-family: var(--display);
+      font-size: 2.2rem;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .hub-title em {
+      font-style: italic;
+      color: var(--terracotta-ink);
+      font-size: 1.3rem;
+      display: block;
+      font-weight: 400;
+    }
+    .hub-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(59, 42, 33, 0.06);
+    }
+    .hub-card h2 {
+      font-family: var(--display);
+      font-size: 1.35rem;
+      margin-bottom: 6px;
+    }
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .table-link {
+      background: var(--paper);
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+      text-decoration: none;
+      color: var(--espresso);
+      font-weight: 600;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .table-link:hover {
+      border-color: var(--terracotta-ink);
+      background: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 42, 33, 0.1);
+    }
+    .table-link span {
+      font-family: var(--display);
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .table-link small {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .btn-admin {
+      background: var(--espresso);
+      color: var(--cream);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 52px;
+      border-radius: 99px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 1.05rem;
+      margin-top: 14px;
+      box-shadow: 0 8px 20px rgba(59, 42, 33, 0.2);
+    }
+    .btn-admin:hover {
+      background: #2a1d16;
+    }
+    .creds-box {
+      background: #fbf4e6;
+      border: 1px dashed var(--gold);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-top: 12px;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .creds-box code {
+      background: var(--espresso);
+      color: var(--cream);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="hub-container">
+    <div class="hub-header">
+      <img src="/logo-256.webp" class="hub-logo" width="90" height="90" alt="Muse Logo" />
+      <h1 class="hub-title">Muse Bread & Brew <em>QR Code Menu Ordering System</em></h1>
+    </div>
+
+    <!-- Admin Panel Card -->
+    <div class="hub-card">
+      <h2>Manager & Kitchen Dashboard</h2>
+      <p class="muted small">
+        Live order status tracking, kitchen queue, tables management, QR printing, menu editor, reports, and customer loyalty.
+      </p>
+      <div class="creds-box">
+        <span>Default Admin Login:</span>
+        <span>User: <code>admin</code> · Pass: <code>muse123</code></span>
+      </div>
+      <a href="/admin" class="btn-admin">
+        <span>Open Admin Dashboard →</span>
+      </a>
+    </div>
+
+    <!-- Network Address Notice -->
+    <div class="hub-card" style="border-left: 4px solid var(--gold);">
+      <h2>📶 Real Mobile Phone Testing</h2>
+      <p class="muted small" style="margin-bottom: 8px;">
+        To test on your real mobile phone camera, ensure your phone is connected to the same Wi-Fi network and open:
+      </p>
+      <div class="creds-box" style="background: var(--paper); border: 1.5px solid var(--line);">
+        <span>Network URL:</span>
+        <code id="networkUrlText" style="font-size: 0.95rem;">http://10.106.47.22:3000</code>
+      </div>
+      <p class="muted small" style="margin-top: 8px; font-size: 0.78rem;">
+        💡 Any QR code printed from the dashboard automatically encodes this network address so physical scans work seamlessly!
+      </p>
+    </div>
+
+    <!-- Customer QR Tables Card -->
+    <div class="hub-card">
+      <h2>Scan Table QR Code (Customer View)</h2>
+      <p class="muted small">
+        Click any table below to test the mobile ordering interface exactly as guests see when scanning the table's QR code.
+      </p>
+
+      <div class="hub-grid" id="tablesGrid">
+        <div style="padding: 20px; text-align: center; color: var(--muted); grid-column: 1 / -1;">
+          Loading tables…
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadTables() {
+      try {
+        const res = await fetch('/api/admin/tables');
+        const data = await res.json();
+        if (data.base_url) {
+          const netEl = document.getElementById('networkUrlText');
+          if (netEl) netEl.textContent = data.base_url;
+        }
+        const grid = document.getElementById('tablesGrid');
+        if (!data.tables || !data.tables.length) {
+          grid.innerHTML = '<p class="muted">No tables configured yet.</p>';
+          return;
+        }
+
+        grid.innerHTML = data.tables.map(t => `
+          <a href="/t/${t.qr_token}" class="table-link">
+            <span>Table ${t.number}</span>
+            <small>Scan QR Menu</small>
+          </a>
+        `).join('');
+      } catch (e) {
+        document.getElementById('tablesGrid').innerHTML = '<p class="muted">Failed to load tables.</p>';
+      }
+    }
+    loadTables();
+  </script>
+</body>
+</html>
+

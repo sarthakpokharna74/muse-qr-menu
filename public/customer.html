@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Muse Bread & Brew · Table Menu</title>
+  <link rel="icon" type="image/webp" href="/logo-96.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/index-ChRsq97C.css" />
+  <style>
+    /* Mobile-first touch & performance optimizations */
+    *, *:before, *:after {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    body {
+      touch-action: manipulation;
+      overflow-x: hidden;
+      background: var(--cream);
+      -webkit-font-smoothing: antialiased;
+    }
+    .cust-app {
+      max-width: 520px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--cream);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 90px;
+    }
+    
+    /* Drawers & Overlays */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30, 20, 15, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .drawer-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .drawer-content {
+      background: #fff;
+      border-radius: 26px 26px 0 0;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+      box-shadow: 0 -10px 40px rgba(59, 42, 33, 0.25);
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer-overlay.active .drawer-content {
+      transform: translateY(0);
+    }
+    .drawer-handle {
+      width: 42px;
+      height: 4px;
+      background: var(--line);
+      border-radius: 99px;
+      margin: 0 auto 14px;
+    }
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .drawer-title {
+      font-family: var(--display);
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--espresso);
+    }
+    .close-icon-btn {
+      background: var(--cream);
+      border: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      color: var(--espresso);
+      cursor: pointer;
+    }
+
+    /* Floating Cart Bar */
+    .cartbar-wrap {
+      z-index: 90;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(180deg, rgba(248, 241, 231, 0) 0%, var(--cream) 40%);
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      transform: translateY(120%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cartbar-wrap.visible {
+      transform: translateY(0);
+    }
+    .cartbar-inner {
+      background: var(--espresso);
+      max-width: 488px;
+      min-height: 56px;
+      color: var(--cream);
+      border-radius: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 auto;
+      padding: 0 20px;
+      cursor: pointer;
+      box-shadow: 0 10px 24px -6px rgba(59, 42, 33, 0.45);
+    }
+    .cartbar-inner:active {
+      transform: scale(0.98);
+    }
+
+    /* Floating Active Order Tracker Pill */
+    .active-tracker-wrap {
+      z-index: 89;
+      position: fixed;
+      bottom: calc(16px + env(safe-area-inset-bottom));
+      left: 0;
+      right: 0;
+      padding: 0 16px;
+      transform: translateY(150%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .active-tracker-wrap.visible {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .active-tracker-wrap.with-cart {
+      bottom: calc(84px + env(safe-area-inset-bottom));
+    }
+    .active-tracker-inner {
+      background: linear-gradient(135deg, #2b1f16 0%, #1c1511 100%);
+      border: 1.5px solid var(--gold);
+      max-width: 488px;
+      min-height: 48px;
+      color: #fff;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 auto;
+      padding: 0 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(59, 42, 33, 0.35);
+    }
+    .active-tracker-inner:active {
+      transform: scale(0.98);
+    }
+    .active-tracker-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pulse-live-dot {
+      width: 10px;
+      height: 10px;
+      background: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      animation: liveDotPulse 1.6s infinite;
+    }
+    @keyframes liveDotPulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .active-tracker-cta {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Loyalty & Rewards UI */
+    .loyalty-balance-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #fdf8ee 0%, #faecd5 100%);
+      border: 1px solid var(--gold);
+      color: #78350f;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+    .reward-pill-btn {
+      background: #fff;
+      border: 1.5px solid var(--gold);
+      color: var(--espresso);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .reward-pill-btn:hover {
+      background: var(--gold-pale);
+      border-color: #b45309;
+    }
+    .reward-pill-btn.active {
+      background: #78350f;
+      color: #fff;
+      border-color: #78350f;
+    }
+    .points-history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 0.82rem;
+    }
+    .points-plus {
+      color: #15803d;
+      font-weight: 700;
+    }
+    .points-minus {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+
+    /* Steppers */
+    .stepper {
+      background: var(--terracotta-ink);
+      color: #fff;
+      border-radius: 12px;
+      align-items: center;
+      min-width: 96px;
+      height: 38px;
+      display: inline-flex;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .stepper button {
+      background: none;
+      border: none;
+      color: #fff;
+      width: 32px;
+      height: 38px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .stepper span {
+      flex: 1;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    /* Quick Action Buttons */
+    .table-actions-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .table-action-pill {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #fff;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .table-action-pill:active {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    /* Toast Notification */
+    .toast-msg {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: var(--espresso);
+      color: var(--cream);
+      padding: 10px 18px;
+      border-radius: 99px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+      z-index: 200;
+      font-size: 0.88rem;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 90vw;
+      text-align: center;
+    }
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Order tracker steps */
+    .progress-stepper {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin: 22px 0;
+      width: 100%;
+    }
+    .progress-stepper::before {
+      content: '';
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      right: 20px;
+      height: 3px;
+      background: var(--line);
+      z-index: 1;
+    }
+    .p-step {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      flex: 1;
+    }
+    .p-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--paper);
+      border: 2px solid var(--line);
+      display: grid;
+      place-items: center;
+      font-size: 0.82rem;
+      color: var(--espresso);
+      transition: all 0.2s;
+    }
+    .p-step.active .p-circle {
+      background: var(--terracotta-ink);
+      border-color: var(--terracotta-ink);
+      color: #fff;
+      box-shadow: 0 0 0 4px #c2876a33;
+    }
+    .p-step.done .p-circle {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: #fff;
+    }
+    .p-step.active, .p-step.done {
+      color: var(--espresso);
+    }
+
+    /* Voucher chips in cart */
+    .voucher-chip-btn {
+      background: #fbf4e6;
+      border: 1px dashed var(--gold);
+      color: #8c5d1e;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .voucher-chip-btn:hover, .voucher-chip-btn:active {
+      background: #f5e8cc;
+    }
+
+    /* Offers Carousel styling */
+    .offers {
+      margin-bottom: 20px;
+    }
+    .offer-scroll {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 4px 2px 12px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .offer-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .offer-card {
+      min-width: 210px;
+      max-width: 250px;
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      padding: 14px 16px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(42, 31, 23, 0.05);
+      transition: transform 0.15s ease;
+    }
+    .offer-card:active {
+      transform: scale(0.98);
+    }
+    .offer-card.tone-0 {
+      background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      border: 1px solid #fdba74;
+      color: #9a3412;
+    }
+    .offer-card.tone-1 {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+    .offer-card.tone-2 {
+      background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
+      border: 1px solid #f0abfc;
+      color: #86198f;
+    }
+    .offer-big {
+      font-family: var(--display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 2px;
+    }
+    .offer-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+    .offer-desc {
+      font-size: 0.76rem;
+      opacity: 0.85;
+      line-height: 1.3;
+      margin-bottom: 8px;
+    }
+    .offer-when {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(0, 0, 0, 0.12);
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast-msg">
+    <span id="toastIcon">☕</span>
+    <span id="toastText"></span>
+  </div>
+
+  <div class="cust-app" id="mainContainer">
+    <!-- Hero Header -->
+    <header class="hero">
+      <div class="hero-top">
+        <span class="table-pill dark" id="tableHeaderPill">Table ...</span>
+        <button type="button" class="me-btn" id="openProfileBtn" aria-label="Customer Profile">
+          <span id="profileAvatarIcon">👤</span>
+        </button>
+      </div>
+
+      <div class="hero-body">
+        <img src="/logo-96.webp" class="hero-logo" width="60" height="60" alt="Muse Logo" />
+        <div>
+          <p class="hero-hi">Welcome to</p>
+          <h1 id="cafeNameHero">Muse Bread & Brew <em>Artisanal Bakery & Cafe</em></h1>
+        </div>
+      </div>
+
+      <div class="table-actions-row">
+        <button type="button" class="table-action-pill" id="quickCallWaiterBtn">
+          <span>🔔</span> Call Waiter
+        </button>
+        <button type="button" class="table-action-pill" id="quickTableBillBtn">
+          <span>📋</span> Table Orders
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Sheet -->
+    <main class="sheet">
+      <!-- Paused Alert Banner -->
+      <div id="orderingPausedBanner" style="display: none; background: #fdf2e9; border: 1.5px solid var(--gold); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; color: var(--espresso); font-size: 0.9rem;">
+        <strong>⚠️ Online ordering is currently paused</strong><br />
+        You can explore our menu below and please order at the counter.
+      </div>
+
+      <!-- Offers Carousel -->
+      <section class="offers" id="offersSection" style="display: none;" aria-label="Offers">
+        <h2 class="section-title">Special Offers</h2>
+        <div class="offer-scroll" id="offersScrollContainer"></div>
+      </section>
+
+      <!-- Instant Search Box -->
+      <div class="searchbox" style="margin-bottom: 14px;">
+        <span>🔍</span>
+        <input type="text" id="menuSearchInput" placeholder="Search coffee, croissants, toasts…" autocomplete="off" />
+        <button type="button" id="clearSearchBtn" style="display: none; background: none; border: none; font-size: 1.1rem; color: var(--muted); cursor: pointer; padding: 4px;">✕</button>
+      </div>
+
+      <!-- Category Filter Chips -->
+      <div class="chips-scroll" id="categoryChipsContainer" style="margin: 0 -16px 16px; padding: 0 16px;">
+        <button type="button" class="chip on" data-cat="all">All</button>
+      </div>
+
+      <!-- Menu Items Container -->
+      <div id="menuItemsContainer">
+        <div style="padding: 40px 0; text-align: center; color: var(--muted);">
+          <div class="round" style="width: 36px; height: 36px; border: 3px solid var(--gold); border-top-color: transparent; animation: spin 0.8s linear infinite;"></div>
+          <p style="margin-top: 12px; font-weight: 600;">Loading menu…</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Floating Active Order Tracker Pill -->
+    <div class="active-tracker-wrap" id="floatingActiveOrderPill">
+      <div class="active-tracker-inner" id="activeOrderPillClickable" role="button" tabindex="0">
+        <div class="active-tracker-left">
+          <div class="pulse-live-dot"></div>
+          <div>
+            <strong id="activeTrackerPillTitle">Order #...</strong>
+            <span id="activeTrackerPillStatus" style="margin-left: 6px; font-size: 0.82rem; opacity: 0.9;">Cooking</span>
+          </div>
+        </div>
+        <div class="active-tracker-cta">View Status ➔</div>
+      </div>
+    </div>
+
+    <!-- Floating Cart Bar -->
+    <div class="cartbar-wrap" id="floatingCartBar">
+      <div class="cartbar-inner" id="cartBarClickable" role="button" tabindex="0">
+        <div class="cartbar-count">
+          <span id="cartBarQty">0 items</span>
+          <small id="cartBarTotal">₹0</small>
+        </div>
+        <div class="cartbar-cta">View Order →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. CART & CHECKOUT DRAWER -->
+  <div class="drawer-overlay" id="cartDrawer">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <h2 class="drawer-title" id="cartDrawerTitle">Your Order</h2>
+        <button type="button" class="close-icon-btn" id="closeCartDrawerBtn">✕</button>
+      </div>
+
+      <!-- Cart Items List -->
+      <ul class="items" id="cartDrawerItemsList" style="margin-bottom: 14px;"></ul>
+
+      <!-- Promo Code Section -->
+      <div style="margin-bottom: 16px;">
+        <div id="appliedVoucherBanner" style="display: none; background: #eef4ea; border: 1.5px solid var(--ok); border-radius: 12px; padding: 10px 14px; justify-content: space-between; align-items: center;">
+          <div>
+            <strong id="appliedVoucherCode" style="color: var(--ok); font-size: 0.95rem;">MUSE50 applied</strong>
+            <small id="appliedVoucherDiscount" style="display: block; color: var(--espresso-soft);">Saved ₹50</small>
+          </div>
+          <button type="button" id="removeVoucherBtn" class="close-icon-btn" style="width: 28px; height: 28px; font-size: 0.85rem;">✕</button>
+        </div>
+
+        <div id="voucherInputRow" style="display: flex; gap: 8px;">
+          <input type="text" id="voucherCodeInput" placeholder="Enter coupon (e.g. MUSE50)" style="flex: 1; height: 44px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--paper); font-size: 0.88rem; text-transform: uppercase;" />
+          <button type="button" id="applyVoucherBtn" class="btn" style="min-height: 44px; padding: 0 18px; font-size: 0.85rem;">Apply</button>
+        </div>
+
+        <!-- Available Coupon Suggestions -->
+        <div id="availableVouchersList" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
+      </div>
+
+      <!-- Loyalty Rewards & Points Section -->
+      <div id="cartLoyaltySection" style="margin-bottom: 16px;"></div>
+
+      <!-- Bill Breakdown -->
+      <div class="card bill-card" style="padding: 14px; margin-bottom: 16px; border-radius: 16px;">
+        <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;">Bill Summary</h3>
+        <div class="bill-row">
+          <span>Item Total</span>
+          <span id="billSubtotal">₹0</span>
+        </div>
+        <div class="bill-row save" id="billDiscountRow" style="display: none;">
+          <span id="billDiscountLabel">Savings</span>
+          <span id="billDiscountVal">−₹0</span>
+        </div>
+        <div class="bill-row save" id="billRewardRow" style="display: none; color: #b45309;">
+          <span id="billRewardLabel">🎁 Loyalty Reward</span>
+          <span id="billRewardVal">−₹0</span>
+        </div>
+        <div class="bill-row">
+          <span>GST (5%)</span>
+          <span id="billGst">₹0</span>
+        </div>
+        <div class="bill" style="padding-top: 8px;">
+          <span>To Pay</span>
+          <strong id="billGrandTotal">₹0</strong>
+        </div>
+        <div class="bill-row" id="billPointsEarnedRow" style="font-size: 0.8rem; color: #8c5d1e; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line);">
+          <span>⭐ Loyalty Points Earned</span>
+          <strong id="billPointsEarnedText">+0 pts</strong>
+        </div>
+      </div>
+
+      <!-- Guest Details Form -->
+      <div id="guestDetailsContainer" style="margin-bottom: 16px;">
+        <div id="loggedInUserCard" style="display: none; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; justify-content: space-between; align-items: center;">
+          <div>
+            <strong id="loggedInUserName">Guest</strong>
+            <span class="muted small" id="loggedInUserPhone" style="display: block;">9876543210</span>
+          </div>
+          <button type="button" id="switchUserBtn" class="text-link small">Change</button>
+        </div>
+
+        <div id="guestInputsBox" style="display: grid; gap: 8px;">
+          <label class="small" style="font-weight: 600;">Your Name</label>
+          <input type="text" id="custNameInput" placeholder="Enter your name" style="height: 44px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--paper); font-size: 0.9rem;" />
+
+          <label class="small" style="font-weight: 600;">Mobile Number</label>
+          <input type="tel" id="custPhoneInput" maxlength="10" placeholder="10-digit mobile number" style="height: 44px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--paper); font-size: 0.9rem;" />
+        </div>
+
+        <!-- Security PIN Row (Positioned so it works seamlessly for BOTH logged-in & guest customers) -->
+        <div id="cartPinRow" style="display: none; margin-top: 10px; background: #fffbeb; border: 1.5px solid var(--gold); border-radius: 12px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="small" id="cartPinLabel" style="font-weight: 700; color: var(--espresso);">🔒 Enter 4-Digit Security PIN</label>
+            <button type="button" id="cartForgotPinBtn" class="text-link small" style="font-size: 0.78rem;">Forgot PIN?</button>
+          </div>
+          <input type="password" id="custPinInput" maxlength="4" placeholder="••••" style="width: 100%; height: 44px; border: 1.5px solid var(--gold); border-radius: 10px; padding: 0 12px; background: #fff; font-size: 1.25rem; letter-spacing: 0.3em; text-align: center;" />
+          <small id="cartPinHint" class="muted" style="font-size: 0.76rem; display: block; margin-top: 4px;">Enter your 4-digit PIN to authorize loyalty points redemption</small>
+        </div>
+      </div>
+
+      <!-- Order Note for Kitchen -->
+      <div style="margin-bottom: 16px;">
+        <input type="text" id="orderKitchenNoteInput" placeholder="Add order note for kitchen / barista…" style="width: 100%; height: 42px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--paper); font-size: 0.85rem;" />
+      </div>
+
+      <!-- Send Order CTA -->
+      <button type="button" class="btn" id="sendOrderToKitchenBtn" style="width: 100%; min-height: 52px; font-size: 1.05rem;">
+        Send Order to Kitchen
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. LIVE ORDER STATUS TRACKING DRAWER -->
+  <div class="drawer-overlay" id="orderStatusDrawer">
+    <div class="drawer-content done" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="done-card">
+        <div class="tick">✓</div>
+        <h1 style="font-size: 1.7rem; margin-top: 6px;" id="orderStatusTitle">Order Received</h1>
+        <p class="done-sub" id="orderStatusDesc">The kitchen has accepted your order.</p>
+
+        <div style="background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 18px; width: 100%; margin: 10px 0;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <strong id="orderTicketNumber">Order #...</strong>
+            <span class="table-pill dark" id="orderTableBadge" style="font-size: 0.78rem; padding: 3px 10px;">Table 1</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: var(--muted); font-size: 0.85rem;">
+            <span>Bill Total</span>
+            <strong style="color: var(--espresso);" id="orderTicketTotal">₹0</strong>
+          </div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="progress-stepper">
+          <div class="p-step active" id="pStep1">
+            <div class="p-circle">1</div>
+            <span>Received</span>
+          </div>
+          <div class="p-step" id="pStep2">
+            <div class="p-circle">2</div>
+            <span>Cooking</span>
+          </div>
+          <div class="p-step" id="pStep3">
+            <div class="p-circle">3</div>
+            <span>Served</span>
+          </div>
+          <div class="p-step" id="pStep4">
+            <div class="p-circle">4</div>
+            <span>Paid</span>
+          </div>
+        </div>
+
+        <div id="pointsEarnedBox" style="display: none; margin-bottom: 12px;">
+          <span class="badge" style="background: #fbf4e6; color: #8c5d1e; border: 1px solid var(--gold); padding: 4px 12px; font-size: 0.8rem;">
+            ⭐ <span id="pointsEarnedText">+0 Points</span> on payment
+          </span>
+        </div>
+
+        <!-- In-drawer Status Notice for Waiter Calls & Bill Requests -->
+        <div id="serviceActionNotice" style="display: none; width: 100%; border-radius: 12px; padding: 12px 14px; margin: 8px 0; font-size: 0.88rem; text-align: left; animation: fadeIn 0.25s ease;"></div>
+
+        <div style="display: grid; gap: 10px; width: 100%; margin-top: 6px;">
+          <button type="button" class="btn" id="orderMoreItemsBtn">Order More Items</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-outline" id="statusCallWaiterBtn" style="flex: 1;">🔔 Call Waiter</button>
+            <button type="button" class="btn-outline" id="statusRequestBillBtn" style="flex: 1;">💳 Request Bill</button>
+          </div>
+          <button type="button" class="text-link small" id="closeStatusDrawerBtn">Close Tracking</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. SPECIAL INSTRUCTION MODAL -->
+  <div class="drawer-overlay" id="itemNoteDrawer">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <h2 class="drawer-title">Cooking Instruction</h2>
+        <button type="button" class="close-icon-btn" id="closeNoteDrawerBtn">✕</button>
+      </div>
+      <p style="font-weight: 700; margin-bottom: 6px;" id="noteItemNameTitle">Item</p>
+      <p class="muted small" style="margin-bottom: 12px;">Specify your preference (e.g. oat milk, less ice, extra hot, no onions).</p>
+      <textarea id="itemNoteInput" rows="3" placeholder="Type instructions here…" style="width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; background: var(--paper); font-size: 0.9rem; margin-bottom: 14px; font-family: inherit;"></textarea>
+      <button type="button" class="btn" id="saveItemNoteBtn" style="width: 100%;">Save Instruction</button>
+    </div>
+  </div>
+
+  <!-- 4. TABLE ACTIVE ORDERS (TABLE BILL) -->
+  <div class="drawer-overlay" id="tableOrdersDrawer">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <h2 class="drawer-title" id="tableOrdersTitle">Table Running Orders</h2>
+        <button type="button" class="close-icon-btn" id="closeTableOrdersBtn">✕</button>
+      </div>
+      <div id="tableOrdersListContainer" style="display: grid; gap: 10px; margin-bottom: 16px;"></div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn-outline" id="ordersCallWaiterBtn" style="flex: 1;">🔔 Call Waiter</button>
+        <button type="button" class="btn" id="ordersRequestBillBtn" style="flex: 1;">💳 Request Bill</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. LOYALTY PROFILE MODAL -->
+  <div class="drawer-overlay" id="profileDrawer">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <h2 class="drawer-title">Muse Loyalty & Profile</h2>
+        <button type="button" class="close-icon-btn" id="closeProfileDrawerBtn">✕</button>
+      </div>
+
+      <div id="profileDetailsBox"></div>
+    </div>
+  </div>
+
+  <script src="/customer.js"></script>
+</body>
+</html>
