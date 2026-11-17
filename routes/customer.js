@@ -26,6 +26,9 @@ function handleCustomer(req, res, pathname, query, db) {
     const cafeName = getSetting(db, 'cafe_name', 'Muse Bread & Brew');
     const orderingOpen = getSetting(db, 'ordering_open', 'true') === 'true';
     const customerPin = getSetting(db, 'customer_pin', 'true') === 'true';
+    const customLogoFile = path.join(__dirname, '..', 'public', 'custom-logo.png');
+    const hasCustomLogo = fs.existsSync(customLogoFile);
+    const logoUrl = hasCustomLogo ? '/custom-logo.png' : '/logo-256.webp';
 
     const categories = db.prepare('SELECT * FROM categories WHERE active = 1 ORDER BY sort_order ASC, id ASC').all();
     const items = db.prepare('SELECT * FROM items ORDER BY sort_order ASC, id ASC').all().map(it => ({
@@ -114,6 +117,8 @@ function handleCustomer(req, res, pathname, query, db) {
       },
       cafe: {
         name: cafeName,
+        logo_url: logoUrl,
+        has_custom_logo: hasCustomLogo,
         ordering_open: orderingOpen,
         customer_pin: customerPin
       },
@@ -717,7 +722,7 @@ function handleCustomer(req, res, pathname, query, db) {
 
     const orders = db.prepare(`
       SELECT * FROM orders 
-      WHERE table_number = ? AND status IN ('open', 'received', 'served')
+      WHERE table_number = ? AND status IN ('open', 'received', 'accepted', 'preparing', 'cooking', 'ready', 'served')
       ORDER BY id DESC
     `).all(table.number).map(o => {
       const items = db.prepare('SELECT name, qty, line_total FROM order_items WHERE order_id = ?').all(o.id);

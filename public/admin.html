@@ -99,10 +99,15 @@
   <!-- Floating Waiter & Bill Alerts Container -->
   <div id="adminAlertsBannerHost"></div>
 
-  <!-- Floating Shortcut to Kitchen Display System -->
-  <a href="/kitchen" target="_blank" id="adminKitchenShortcut" style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; background: #0f172a; color: #f8fafc; border: 1.5px solid #334155; padding: 10px 18px; border-radius: 50px; font-weight: 700; font-size: 0.88rem; text-decoration: none; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-    <span>👨‍🍳</span> Kitchen Display (Chef Panel) ↗
-  </a>
+  <!-- Floating Shortcut Dock: Kitchen Display + Notification Sound Manager -->
+  <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <a href="/kitchen" target="_blank" id="adminKitchenShortcut" style="background: #0f172a; color: #f8fafc; border: 1.5px solid #334155; padding: 10px 18px; border-radius: 50px; font-weight: 700; font-size: 0.88rem; text-decoration: none; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <span>👨‍🍳</span> Kitchen Display (Chef Panel) ↗
+    </a>
+    <button type="button" id="adminSoundShortcut" onclick="window.openSoundSettingsModal()" style="background: #451a03; color: #fef3c7; border: 1.5px solid #92400e; padding: 10px 18px; border-radius: 50px; font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); cursor: pointer; transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <span>🔔</span> Alert Sound & Chime
+    </button>
+  </div>
 
   <script type="module" src="/assets/index-DEbz15yT.js"></script>
 
@@ -480,6 +485,189 @@
       }
 
       
+      // SOUND SETTINGS MODAL (Browse laptop for sound or pick preset chimes)
+      window.openSoundSettingsModal = function () {
+        const existing = document.getElementById('soundSettingsModalOverlay');
+        if (existing) existing.remove();
+
+        const curType = localStorage.getItem('muse_sound_type') || 'bell';
+        const curName = localStorage.getItem('muse_sound_name') || 'Kitchen Brass Bell (Default)';
+        const curVol = localStorage.getItem('muse_sound_volume') || '1.0';
+        const customFileName = localStorage.getItem('muse_custom_sound_name') || '';
+
+        const overlay = document.createElement('div');
+        overlay.id = 'soundSettingsModalOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,15,10,0.65);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+        overlay.innerHTML = `
+          <div style="background:#ffffff;border-radius:22px;max-width:460px;width:100%;padding:26px 24px;box-shadow:0 24px 60px rgba(0,0,0,0.35);font-family:system-ui,-apple-system,sans-serif;color:#2b1f16;position:relative;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h2 style="font-size:1.3rem;font-weight:700;margin:0;display:flex;align-items:center;gap:8px;">
+                <span>🔔</span> Notification Sound
+              </h2>
+              <button type="button" onclick="document.getElementById('soundSettingsModalOverlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#78716c;padding:4px;">✕</button>
+            </div>
+
+            <p style="font-size:0.88rem;color:#78716c;margin:0 0 16px;">
+              Select the chime for incoming orders, food-ready alerts, and waiter calls, or select a custom audio file directly from your laptop.
+            </p>
+
+            <div style="background:#fdfbf7;border:1.5px solid #ebd9c8;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
+              <div style="font-size:0.8rem;text-transform:uppercase;color:#8d5b4c;font-weight:700;letter-spacing:0.04em;">Current Active Sound:</div>
+              <div id="modalActiveSoundLabel" style="font-weight:700;font-size:1.05rem;color:#3b2a21;margin-top:2px;">${curName}</div>
+              ${customFileName ? `<div style="font-size:0.8rem;color:#78716c;margin-top:4px;">Device File: <code>${customFileName}</code></div>` : ''}
+            </div>
+
+            <!-- BROWSE AUDIO FILE BUTTON -->
+            <div style="margin-bottom:20px;">
+              <input type="file" id="modalAudioFileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac" style="display:none;" />
+              <button type="button" id="modalBrowseAudioBtn" style="width:100%;background:linear-gradient(135deg, #3b2a21 0%, #1f140e 100%);color:#fff;border:none;border-radius:14px;padding:14px 18px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 14px rgba(59,42,33,0.3);transition:transform 0.15s ease;">
+                <span>📁</span> Browse Laptop for Custom Sound (.mp3, .wav, .ogg)
+              </button>
+              <div id="modalUploadStatus" style="font-size:0.82rem;color:#16a34a;margin-top:6px;min-height:16px;text-align:center;font-weight:600;"></div>
+            </div>
+
+            <!-- PRESET CHIMES -->
+            <div style="margin-bottom:18px;">
+              <label style="font-size:0.85rem;font-weight:700;color:#57534e;display:block;margin-bottom:8px;">Or Choose Preset Chime:</label>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                <button type="button" class="modal-sound-preset-btn" data-type="bell" data-name="Kitchen Brass Bell (Default)" style="padding:10px;border:1.5px solid ${curType==='bell'?'#3b2a21':'#e7e5e4'};background:${curType==='bell'?'#fbf7f2':'#fdfbf7'};border-radius:10px;font-weight:600;font-size:0.88rem;cursor:pointer;text-align:left;color:#2b1f16;">
+                  🔔 Kitchen Bell
+                </button>
+                <button type="button" class="modal-sound-preset-btn" data-type="chime" data-name="Double Chime (Ding-Dong)" style="padding:10px;border:1.5px solid ${curType==='chime'?'#3b2a21':'#e7e5e4'};background:${curType==='chime'?'#fbf7f2':'#fdfbf7'};border-radius:10px;font-weight:600;font-size:0.88rem;cursor:pointer;text-align:left;color:#2b1f16;">
+                  🎵 Double Chime
+                </button>
+                <button type="button" class="modal-sound-preset-btn" data-type="beep" data-name="Digital Alert Beep" style="padding:10px;border:1.5px solid ${curType==='beep'?'#3b2a21':'#e7e5e4'};background:${curType==='beep'?'#fbf7f2':'#fdfbf7'};border-radius:10px;font-weight:600;font-size:0.88rem;cursor:pointer;text-align:left;color:#2b1f16;">
+                  ⚡ Digital Beep
+                </button>
+                <button type="button" class="modal-sound-preset-btn" data-type="marimba" data-name="Warm Marimba Chime" style="padding:10px;border:1.5px solid ${curType==='marimba'?'#3b2a21':'#e7e5e4'};background:${curType==='marimba'?'#fbf7f2':'#fdfbf7'};border-radius:10px;font-weight:600;font-size:0.88rem;cursor:pointer;text-align:left;color:#2b1f16;">
+                  🎶 Warm Marimba
+                </button>
+              </div>
+            </div>
+
+            <!-- TEST & VOLUME -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f5f5f4;border-radius:12px;margin-bottom:20px;">
+              <button type="button" id="modalTestSoundBtn" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:0.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                <span>▶</span> Test Sound
+              </button>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:0.82rem;font-weight:600;color:#57534e;">Volume:</span>
+                <input type="range" id="modalSoundVol" min="0.1" max="1.0" step="0.1" value="${curVol}" style="width:90px;cursor:pointer;" />
+              </div>
+            </div>
+
+            <div style="text-align:right;">
+              <button type="button" onclick="document.getElementById('soundSettingsModalOverlay').remove()" style="background:#1c1917;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-weight:700;font-size:0.92rem;cursor:pointer;">
+                Done
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const fileInput = document.getElementById('modalAudioFileInput');
+        const browseBtn = document.getElementById('modalBrowseAudioBtn');
+        const uploadStatus = document.getElementById('modalUploadStatus');
+        const labelEl = document.getElementById('modalActiveSoundLabel');
+        const testBtn = document.getElementById('modalTestSoundBtn');
+        const volSlider = document.getElementById('modalSoundVol');
+
+        browseBtn.addEventListener('click', () => {
+          fileInput.value = '';
+          fileInput.click();
+        });
+
+        fileInput.addEventListener('change', async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+
+          uploadStatus.style.color = '#0284c7';
+          uploadStatus.textContent = 'Loading ' + file.name + '...';
+
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const dataUrl = ev.target.result;
+            const soundName = 'Custom: ' + file.name;
+            localStorage.setItem('muse_sound_type', 'custom');
+            localStorage.setItem('muse_custom_sound', dataUrl);
+            localStorage.setItem('muse_custom_sound_name', file.name);
+            localStorage.setItem('muse_sound_name', soundName);
+
+            labelEl.textContent = soundName;
+            uploadStatus.style.color = '#16a34a';
+            uploadStatus.textContent = '✅ Sound uploaded: ' + file.name;
+
+            // Update server
+            try {
+              await fetch('/api/admin/sound', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sound_type: 'custom',
+                  sound_name: soundName,
+                  sound_data: dataUrl,
+                  sound_volume: parseFloat(volSlider.value || '1.0')
+                })
+              });
+            } catch {}
+
+            window.playAlertSound('order');
+          };
+          reader.readAsDataURL(file);
+        });
+
+        // Preset button handlers
+        document.querySelectorAll('.modal-sound-preset-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const type = btn.getAttribute('data-type');
+            const name = btn.getAttribute('data-name');
+            localStorage.setItem('muse_sound_type', type);
+            localStorage.setItem('muse_sound_name', name);
+            labelEl.textContent = name;
+            uploadStatus.textContent = '';
+
+            document.querySelectorAll('.modal-sound-preset-btn').forEach(b => {
+              b.style.borderColor = '#e7e5e4';
+              b.style.background = '#fdfbf7';
+            });
+            btn.style.borderColor = '#3b2a21';
+            btn.style.background = '#fbf7f2';
+
+            try {
+              await fetch('/api/admin/sound', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sound_type: type,
+                  sound_name: name,
+                  sound_volume: parseFloat(volSlider.value || '1.0')
+                })
+              });
+            } catch {}
+
+            window.playAlertSound('order');
+          });
+        });
+
+        testBtn.addEventListener('click', () => {
+          window.playAlertSound('order');
+        });
+
+        volSlider.addEventListener('input', async (e) => {
+          const v = String(e.target.value);
+          localStorage.setItem('muse_sound_volume', v);
+          try {
+            await fetch('/api/admin/sound', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sound_volume: parseFloat(v) })
+            });
+          } catch {}
+        });
+      };
+
       // MANAGER AUTHORIZATION ENGINE (4-DIGIT PIN OR BIOMETRICS)
       window.askManagerAuth = function (actionTitle = 'Perform Protected Action') {
         return new Promise((resolve) => {

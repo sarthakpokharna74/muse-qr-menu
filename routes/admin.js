@@ -199,7 +199,7 @@ function handleAdmin(req, res, pathname, query, db) {
     const activeToday = todayOrders.filter(o => o.status !== 'cancelled');
     const cancelledToday = todayOrders.filter(o => o.status === 'cancelled');
     const paidToday = todayOrders.filter(o => o.status === 'done');
-    const toCollectToday = todayOrders.filter(o => ['open', 'received', 'preparing', 'ready', 'served'].includes(o.status));
+    const toCollectToday = todayOrders.filter(o => ['open', 'received', 'accepted', 'preparing', 'cooking', 'ready', 'served'].includes(o.status));
 
     const totalAmount = activeToday.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const paidAmount = paidToday.reduce((sum, o) => sum + Number(o.total || 0), 0);
@@ -247,14 +247,14 @@ function handleAdmin(req, res, pathname, query, db) {
     // Table status cards
     const allTables = db.prepare('SELECT * FROM tables WHERE active = 1 ORDER BY number ASC').all();
     const openOrders = db.prepare(`
-      SELECT * FROM orders WHERE status IN ('open', 'received', 'preparing', 'ready', 'served') ORDER BY created_at ASC
+      SELECT * FROM orders WHERE status IN ('open', 'received', 'accepted', 'preparing', 'cooking', 'ready', 'served') ORDER BY created_at ASC
     `).all();
 
     const tableCards = allTables.map(t => {
       const tblOrders = openOrders.filter(o => o.table_number === t.number);
-      const hasNew = tblOrders.some(o => o.status === 'open');
-      const hasReceived = tblOrders.some(o => o.status === 'received');
-      const hasPreparing = tblOrders.some(o => o.status === 'preparing');
+      const hasNew = tblOrders.some(o => o.status === 'open' || o.status === 'received');
+      const hasAccepted = tblOrders.some(o => o.status === 'accepted');
+      const hasCooking = tblOrders.some(o => o.status === 'preparing' || o.status === 'cooking');
       const hasReady = tblOrders.some(o => o.status === 'ready');
       const hasServed = tblOrders.some(o => o.status === 'served');
       const openTotal = tblOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
@@ -265,10 +265,11 @@ function handleAdmin(req, res, pathname, query, db) {
         open_orders: tblOrders.length,
         open_total: openTotal,
         new: hasNew,
-        received: hasReceived && !hasNew,
-        preparing: hasPreparing,
+        accepted: hasAccepted,
+        received: hasAccepted || hasCooking,
+        preparing: hasCooking,
         ready: hasReady,
-        served: hasServed && !hasNew && !hasReceived && !hasPreparing && !hasReady,
+        served: hasServed && !hasNew && !hasAccepted && !hasCooking && !hasReady,
         since: oldestSince
       };
     });
@@ -295,7 +296,7 @@ function handleAdmin(req, res, pathname, query, db) {
       const tblNum = Number(tableParam);
       orders = db.prepare(`
         SELECT * FROM orders 
-        WHERE table_number = ? AND status IN ('open', 'received', 'served')
+        WHERE table_number = ? AND status IN ('open', 'received', 'accepted', 'preparing', 'cooking', 'ready', 'served')
         ORDER BY id DESC
       `).all(tblNum);
     } else {

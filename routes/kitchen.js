@@ -18,27 +18,27 @@ function handleKitchen(req, res, pathname, query, db) {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('pulse_rev');
     const rev = row ? Number(row.value) : 1;
     const activeCount = db.prepare(`
-      SELECT COUNT(*) as count FROM orders WHERE status IN ('open', 'received', 'preparing', 'ready')
+      SELECT COUNT(*) as count FROM orders WHERE status IN ('open', 'received', 'accepted', 'preparing', 'cooking', 'ready')
     `).get().count;
     return res.json({ rev, activeCount });
   }
 
   // 2. GET /api/kitchen/orders - list of all active orders for chef
   if (req.method === 'GET' && pathname === '/api/kitchen/orders') {
-    const statusFilter = query.status; // optional: 'preparing', 'ready', 'received'
+    const statusFilter = query.status; // optional: 'cooking', 'ready', 'history'
     let sql = `
       SELECT id, number, table_number, status, note, created_at, updated_at
       FROM orders
-      WHERE status IN ('open', 'received', 'preparing', 'ready')
+      WHERE status IN ('open', 'received', 'accepted', 'preparing', 'cooking', 'ready')
     `;
     const params = [];
     if (statusFilter) {
-      if (statusFilter === 'active') {
-        sql = `SELECT id, number, table_number, status, note, created_at, updated_at FROM orders WHERE status IN ('open', 'received', 'preparing')`;
+      if (statusFilter === 'active' || statusFilter === 'cooking') {
+        sql = `SELECT id, number, table_number, status, note, created_at, updated_at FROM orders WHERE status IN ('open', 'received', 'accepted', 'preparing', 'cooking')`;
       } else if (statusFilter === 'ready') {
         sql = `SELECT id, number, table_number, status, note, created_at, updated_at FROM orders WHERE status = 'ready'`;
       } else if (statusFilter === 'history') {
-        sql = `SELECT id, number, table_number, status, note, created_at, updated_at FROM orders WHERE status IN ('served', 'done') ORDER BY id DESC LIMIT 20`;
+        sql = `SELECT id, number, table_number, status, note, created_at, updated_at FROM orders WHERE status IN ('served', 'done') ORDER BY id DESC LIMIT 30`;
       }
     } else {
       sql += ` ORDER BY created_at ASC`;
@@ -61,7 +61,7 @@ function handleKitchen(req, res, pathname, query, db) {
         id: o.id,
         number: o.number,
         table_number: o.table_number,
-        status: o.status === 'open' ? 'received' : o.status,
+        status: o.status,
         note: o.note || '',
         items,
         created_at: o.created_at,
@@ -72,8 +72,9 @@ function handleKitchen(req, res, pathname, query, db) {
 
     // Counts summary
     const counts = {
-      received: result.filter(o => o.status === 'received').length,
-      preparing: result.filter(o => o.status === 'preparing').length,
+      new_orders: result.filter(o => o.status === 'open' || o.status === 'received').length,
+      accepted: result.filter(o => o.status === 'accepted').length,
+      cooking: result.filter(o => o.status === 'preparing' || o.status === 'cooking').length,
       ready: result.filter(o => o.status === 'ready').length,
       total: result.length
     };
@@ -87,7 +88,7 @@ function handleKitchen(req, res, pathname, query, db) {
     const orderId = Number(statusMatch[1]);
     const { status } = req.body || {};
 
-    const validStatuses = ['received', 'preparing', 'ready', 'served'];
+    const validStatuses = ['open', 'received', 'accepted', 'preparing', 'cooking', 'ready', 'served', 'done'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }

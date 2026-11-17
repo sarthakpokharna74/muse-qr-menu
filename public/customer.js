@@ -201,6 +201,11 @@
       }
     }
 
+    const cafeHeroLogo = document.getElementById('cafeHeroLogo');
+    if (cafeHeroLogo && state.cafe && state.cafe.logo_url) {
+      cafeHeroLogo.src = state.cafe.logo_url + '?t=' + Date.now();
+    }
+
     const cartDrawerTitle = document.getElementById('cartDrawerTitle');
     if (cartDrawerTitle && state.table) {
       cartDrawerTitle.textContent = `Table ${state.table.number} Order`;
@@ -649,8 +654,10 @@
 
     if (titleEl) titleEl.textContent = `Order #${o.number}`;
     if (statusEl) {
-      if (o.status === 'open') statusEl.textContent = 'Accepted by Kitchen';
-      else if (o.status === 'received') statusEl.textContent = 'Cooking in Kitchen 🔥';
+      if (o.status === 'open') statusEl.textContent = 'Order Placed 🔔';
+      else if (o.status === 'accepted') statusEl.textContent = 'Order Accepted ✅';
+      else if (o.status === 'cooking' || o.status === 'preparing' || o.status === 'received') statusEl.textContent = 'Cooking in Kitchen 🔥';
+      else if (o.status === 'ready') statusEl.textContent = 'Food Cooked / Ready! 🛎️';
       else if (o.status === 'served') statusEl.textContent = 'Served to Table 🍽️';
       else statusEl.textContent = o.status;
     }
@@ -1053,7 +1060,7 @@
       box.innerHTML = `
         <div class="points-card">
           <div class="pc-top">
-            <img src="/logo-96.webp" width="44" height="44" style="border-radius:50%; border: 1.5px solid var(--gold);" alt="" />
+            <img src="/custom-logo.png" onerror="this.src='/logo-96.webp'" width="44" height="44" style="border-radius:12px; object-fit:contain; background:#fff; padding:2px; border: 1.5px solid var(--gold);" alt="" />
             <div>
               <strong class="pc-name" style="font-size: 1.1rem;">${escapeHtml(c.name)}</strong>
               <span class="pc-sub">${escapeHtml(c.phone)} · Member</span>
@@ -1764,16 +1771,26 @@
     });
 
     if (o.status === 'open') {
-      if (titleEl) titleEl.textContent = 'Order Received';
-      if (descEl) descEl.textContent = 'The kitchen has accepted your order.';
+      if (titleEl) titleEl.textContent = 'Order Placed';
+      if (descEl) descEl.textContent = 'Your order has been sent to the kitchen and owner.';
       if (s1) s1.className = 'p-step active';
-    } else if (o.status === 'received') {
-      if (titleEl) titleEl.textContent = 'Cooking in Kitchen';
-      if (descEl) descEl.textContent = 'Our baristas and chefs are preparing your order.';
+    } else if (o.status === 'accepted') {
+      if (titleEl) titleEl.textContent = 'Order Accepted ✅';
+      if (descEl) descEl.textContent = 'Your order is accepted and queued in the kitchen!';
+      if (s1) s1.className = 'p-step active';
+    } else if (o.status === 'cooking' || o.status === 'preparing' || o.status === 'received') {
+      if (titleEl) titleEl.textContent = 'Cooking in Kitchen 🔥';
+      if (descEl) descEl.textContent = 'Our chefs are currently preparing your fresh food & drinks.';
       if (s1) s1.className = 'p-step done';
       if (s2) s2.className = 'p-step active';
+    } else if (o.status === 'ready') {
+      if (titleEl) titleEl.textContent = 'Food Cooked / Ready! 🛎️';
+      if (descEl) descEl.textContent = 'Your food is cooked and ready! The waiter is on the way to serve your table.';
+      if (s1) s1.className = 'p-step done';
+      if (s2) s2.className = 'p-step done';
+      if (s3) s3.className = 'p-step active';
     } else if (o.status === 'served') {
-      if (titleEl) titleEl.textContent = 'Served to Table';
+      if (titleEl) titleEl.textContent = 'Served to Table 🍽️';
       if (descEl) descEl.textContent = 'Food & drinks have arrived. Enjoy your meal!';
       if (s1) s1.className = 'p-step done';
       if (s2) s2.className = 'p-step done';

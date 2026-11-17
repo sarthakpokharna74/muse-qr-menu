@@ -28,8 +28,14 @@
       margin-bottom: 28px;
     }
     .hub-logo {
-      border-radius: 50%;
-      box-shadow: 0 0 0 4px var(--gold);
+      width: 104px;
+      height: 104px;
+      border-radius: 24px;
+      object-fit: contain;
+      background: #ffffff;
+      padding: 6px;
+      box-shadow: 0 8px 24px rgba(59, 42, 33, 0.15);
+      border: 2.5px solid var(--gold);
       margin-bottom: 12px;
     }
     .hub-title {
@@ -136,7 +142,7 @@
 <body>
   <div class="hub-container">
     <div class="hub-header">
-      <img src="/logo-256.webp" class="hub-logo" width="90" height="90" alt="Muse Logo" />
+      <img src="/custom-logo.png" onerror="this.src='/logo-256.webp'" class="hub-logo" width="104" height="104" alt="Cafe Logo" />
       <h1 class="hub-title">Muse Bread & Brew <em>QR Code Menu Ordering System</em></h1>
     </div>
 

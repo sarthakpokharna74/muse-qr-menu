@@ -68,10 +68,15 @@
     }
 
     .brand img {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
-      object-fit: cover;
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      object-fit: contain;
+      background: #ffffff;
+      padding: 4px;
+      border: 1.5px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      flex-shrink: 0;
     }
 
     .brand-title {
@@ -224,19 +229,25 @@
     }
 
     /* Status based border colors */
-    .order-card.status-received {
-      border-color: #475569;
+    .order-card.status-open, .order-card.status-received {
+      border-color: #3b82f6;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
     }
 
-    .order-card.status-preparing {
+    .order-card.status-accepted {
+      border-color: #06b6d4;
+      box-shadow: 0 4px 20px rgba(6, 182, 212, 0.15);
+    }
+
+    .order-card.status-preparing, .order-card.status-cooking {
       border-color: var(--amber);
-      box-shadow: 0 8px 30px rgba(245, 158, 11, 0.15);
+      box-shadow: 0 8px 30px rgba(245, 158, 11, 0.2);
     }
 
     .order-card.status-ready {
       border-color: var(--green);
       background: linear-gradient(180deg, #182424 0%, #131b20 100%);
-      box-shadow: 0 8px 30px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 8px 30px rgba(16, 185, 129, 0.25);
     }
 
     .card-header {
@@ -408,6 +419,60 @@
       transform: scale(1.01);
     }
 
+    .btn-accept {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-accept:hover {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      transform: scale(1.01);
+    }
+
+    .status-cue {
+      font-size: 0.88rem;
+      padding: 7px 12px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .status-cue-new {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #93c5fd;
+    }
+
+    .status-cue-accepted {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: #67e8f9;
+    }
+
+    .status-cue-cooking {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fde68a;
+    }
+
+    .served-notice {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px dashed #475569;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 10px 12px;
+      border-radius: 8px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
     .btn-ready {
       background: linear-gradient(135deg, #059669 0%, #047857 100%);
       color: #fff;
@@ -544,10 +609,10 @@
 
   <!-- FILTER TABS -->
   <div class="filter-bar">
-    <button class="filter-tab active" onclick="setFilter('all', this)">All Active Orders (<span id="totalActiveCount">0</span>)</button>
-    <button class="filter-tab" onclick="setFilter('cooking', this)">🍳 In Preparation</button>
-    <button class="filter-tab" onclick="setFilter('ready', this)">🛎️ Ready for Pickup</button>
-    <button class="filter-tab" onclick="setFilter('history', this)">📜 Completed Recently</button>
+    <button class="filter-tab active" onclick="setFilter('all', this)">📋 All Active Orders (<span id="totalActiveCount">0</span>)</button>
+    <button class="filter-tab" onclick="setFilter('cooking', this)">🍳 In Preparation (<span id="cookingTabCount">0</span>)</button>
+    <button class="filter-tab" onclick="setFilter('ready', this)">🛎️ Ready for Serve (<span id="readyTabCount">0</span>)</button>
+    <button class="filter-tab" onclick="setFilter('history', this)">📜 Served History</button>
   </div>
 
   <!-- MAIN ORDERS GRID -->
@@ -672,7 +737,7 @@
     async function fetchOrders() {
       try {
         let url = '/api/kitchen/orders';
-        if (currentFilter === 'cooking') url += '?status=active';
+        if (currentFilter === 'cooking') url += '?status=cooking';
         if (currentFilter === 'ready') url += '?status=ready';
         if (currentFilter === 'history') url += '?status=history';
 
@@ -682,9 +747,19 @@
 
         // Update counts
         if (data.counts) {
-          document.getElementById('cookingCount').textContent = data.counts.preparing || 0;
-          document.getElementById('readyCount').textContent = data.counts.ready || 0;
-          document.getElementById('totalActiveCount').textContent = data.counts.total || 0;
+          const totalActive = (data.counts.new_orders || 0) + (data.counts.accepted || 0) + (data.counts.cooking || 0) + (data.counts.ready || 0);
+          const inPrep = (data.counts.accepted || 0) + (data.counts.cooking || 0);
+          const readyNum = data.counts.ready || 0;
+          const cookingEl = document.getElementById('cookingCount');
+          if (cookingEl) cookingEl.textContent = inPrep;
+          const cookingTabEl = document.getElementById('cookingTabCount');
+          if (cookingTabEl) cookingTabEl.textContent = inPrep;
+          const readyEl = document.getElementById('readyCount');
+          if (readyEl) readyEl.textContent = readyNum;
+          const readyTabEl = document.getElementById('readyTabCount');
+          if (readyTabEl) readyTabEl.textContent = readyNum;
+          const totalEl = document.getElementById('totalActiveCount');
+          if (totalEl) totalEl.textContent = totalActive;
         }
 
         // Check for new incoming orders to play bell chime
@@ -727,8 +802,11 @@
         if (min >= 15) timerClass = 'timer-urgent';
         else if (min >= 8) timerClass = 'timer-warning';
 
-        const isPreparing = o.status === 'preparing';
+        const isNew = o.status === 'open' || o.status === 'received';
+        const isAccepted = o.status === 'accepted';
+        const isCooking = o.status === 'cooking' || o.status === 'preparing';
         const isReady = o.status === 'ready';
+        const isServed = o.status === 'served' || o.status === 'done';
 
         return `
           <div class="order-card status-${o.status}" id="order-card-${o.id}">
@@ -764,15 +842,30 @@
               ` : ''}
             </div>
 
-            <!-- FOOTER ACTIONS -->
+            <!-- FOOTER ACTIONS (Distinct Chef vs Owner Responsibilities) -->
             <div class="card-footer">
-              ${!isPreparing && !isReady ? `
-                <button class="btn-action btn-cook" onclick="updateStatus(${o.id}, 'preparing')">
+              ${isNew ? `
+                <div class="status-cue status-cue-new">
+                  <span>🔔</span> New Incoming Order — Click Accept to Confirm
+                </div>
+                <button class="btn-action btn-accept" onclick="updateStatus(${o.id}, 'accepted')">
+                  <span>✅</span> Accept Order
+                </button>
+              ` : ''}
+
+              ${isAccepted ? `
+                <div class="status-cue status-cue-accepted">
+                  <span>✅</span> Order Accepted — Queued in Kitchen
+                </div>
+                <button class="btn-action btn-cook" onclick="updateStatus(${o.id}, 'cooking')">
                   <span>🍳</span> Start Cooking
                 </button>
               ` : ''}
 
-              ${isPreparing ? `
+              ${isCooking ? `
+                <div class="status-cue status-cue-cooking">
+                  <span>🔥</span> Cooking in Kitchen
+                </div>
                 <button class="btn-action btn-ready" onclick="updateStatus(${o.id}, 'ready')">
                   <span>🛎️</span> Food Cooked / Ready!
                 </button>
@@ -780,11 +873,17 @@
 
               ${isReady ? `
                 <div class="ready-banner">
-                  <span>✅</span> Cooked! Waiting for Waiter Pickup
+                  <span>🛎️</span> Food Cooked & Ready!
                 </div>
-                <button class="btn-served" onclick="updateStatus(${o.id}, 'served')">
-                  🍽️ Mark Handed to Table / Served
-                </button>
+                <div class="served-notice">
+                  <span>⏳</span> Waiting for Owner / Waiter to Serve to Table
+                </div>
+              ` : ''}
+
+              ${isServed ? `
+                <div class="ready-banner" style="background: rgba(100, 116, 139, 0.2); border-color: #64748b; color: #cbd5e1;">
+                  <span>🍽️</span> Served to Table by Owner
+                </div>
               ` : ''}
             </div>
           </div>
@@ -802,17 +901,22 @@
         });
         if (res.ok) {
           const data = await res.json();
-          if (newStatus === 'ready') {
-            playKitchenBell('ready');
-            showToast(`🛎️ Table ${data.table_number} food marked Cooked & Ready! Owner notified.`, '✅');
-          } else if (newStatus === 'preparing') {
+          if (newStatus === 'accepted') {
+            showToast(`✅ Table ${data.table_number} Order #${data.order_number} Accepted!`, '✅');
+          } else if (newStatus === 'cooking' || newStatus === 'preparing') {
             showToast(`🍳 Started cooking Table ${data.table_number}`, '🍳');
-          } else if (newStatus === 'served') {
-            showToast(`🍽️ Order #${data.order_number} marked served`, '🍽️');
+          } else if (newStatus === 'ready') {
+            playKitchenBell('ready');
+            showToast(`🛎️ Table ${data.table_number} food marked Cooked & Ready! Owner notified.`, '🛎️');
           }
           fetchOrders();
         } else {
           showToast('Failed to update status', '❌');
+        }
+      } catch (err) {
+        showToast('Network error', '❌');
+      }
+    }
         }
       } catch (err) {
         showToast('Network error', '❌');
