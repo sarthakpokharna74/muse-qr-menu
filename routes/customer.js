@@ -617,13 +617,23 @@ function handleCustomer(req, res, pathname, query, db) {
     `);
 
     for (const it of items) {
-      const lineTotal = it.free ? 0 : Number(it.price || 0) * Number(it.qty || 1);
+      let itemName = it.name;
+      let itemPrice = Number(it.price || 0);
+      if (!itemName && it.item_id) {
+        const dbItem = db.prepare('SELECT name, price FROM items WHERE id = ?').get(it.item_id);
+        if (dbItem) {
+          itemName = dbItem.name;
+          if (!it.price) itemPrice = Number(dbItem.price || 0);
+        }
+      }
+      itemName = itemName || 'Special Item';
+      const lineTotal = it.free ? 0 : itemPrice * Number(it.qty || 1);
       insertOrderItem.run(
         orderId,
         it.item_id ? Number(it.item_id) : null,
-        it.name,
+        itemName,
         Number(it.qty || 1),
-        Number(it.price || 0),
+        itemPrice,
         it.free ? 1 : 0,
         it.note?.trim() || null,
         lineTotal

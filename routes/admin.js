@@ -90,6 +90,27 @@ function handleAdmin(req, res, pathname, query, db) {
       });
     }
 
+    // Include cooked / food ready orders as urgent alerts for owner/waiter
+    const readyOrders = db.prepare(`
+      SELECT * FROM orders WHERE status = 'ready' ORDER BY updated_at DESC
+    `).all();
+
+    for (const r of readyOrders) {
+      const rItems = db.prepare('SELECT name, qty FROM order_items WHERE order_id = ?').all(r.id);
+      unseenOrders.unshift({
+        id: `ready-${r.id}`,
+        order_id: r.id,
+        number: `COOKED #${r.number}`,
+        table: r.table_number,
+        customer_name: `TABLE ${r.table_number} · FOOD READY!`,
+        total: r.total,
+        status: 'ready',
+        items: rItems,
+        flags: '🍳 FOOD COOKED · READY TO SERVE',
+        created_at: r.updated_at
+      });
+    }
+
     const pinResets = db.prepare(`
       SELECT * FROM pin_resets WHERE status = 'pending' ORDER BY id DESC
     `).all().map(p => ({
@@ -127,7 +148,10 @@ function handleAdmin(req, res, pathname, query, db) {
     const calls = db.prepare(`
       SELECT * FROM waiter_calls WHERE status = 'pending' ORDER BY id DESC
     `).all();
-    return res.json({ calls });
+    const readyOrders = db.prepare(`
+      SELECT id, number, table_number, total, updated_at FROM orders WHERE status = 'ready' ORDER BY updated_at DESC
+    `).all();
+    return res.json({ calls, readyOrders });
   }
 
   const waiterSeenMatch = pathname.match(/^\/api\/admin\/waiter-calls\/([^/]+)\/seen$/);
@@ -175,7 +199,7 @@ function handleAdmin(req, res, pathname, query, db) {
     const activeToday = todayOrders.filter(o => o.status !== 'cancelled');
     const cancelledToday = todayOrders.filter(o => o.status === 'cancelled');
     const paidToday = todayOrders.filter(o => o.status === 'done');
-    const toCollectToday = todayOrders.filter(o => ['open', 'received', 'served'].includes(o.status));
+    const toCollectToday = todayOrders.filter(o => ['open', 'received', 'preparing', 'ready', 'served'].includes(o.status));
 
     const totalAmount = activeToday.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const paidAmount = paidToday.reduce((sum, o) => sum + Number(o.total || 0), 0);
@@ -223,13 +247,15 @@ function handleAdmin(req, res, pathname, query, db) {
     // Table status cards
     const allTables = db.prepare('SELECT * FROM tables WHERE active = 1 ORDER BY number ASC').all();
     const openOrders = db.prepare(`
-      SELECT * FROM orders WHERE status IN ('open', 'received', 'served') ORDER BY created_at ASC
+      SELECT * FROM orders WHERE status IN ('open', 'received', 'preparing', 'ready', 'served') ORDER BY created_at ASC
     `).all();
 
     const tableCards = allTables.map(t => {
       const tblOrders = openOrders.filter(o => o.table_number === t.number);
       const hasNew = tblOrders.some(o => o.status === 'open');
       const hasReceived = tblOrders.some(o => o.status === 'received');
+      const hasPreparing = tblOrders.some(o => o.status === 'preparing');
+      const hasReady = tblOrders.some(o => o.status === 'ready');
       const hasServed = tblOrders.some(o => o.status === 'served');
       const openTotal = tblOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
       const oldestSince = tblOrders.length ? tblOrders[0].created_at : null;
@@ -240,7 +266,9 @@ function handleAdmin(req, res, pathname, query, db) {
         open_total: openTotal,
         new: hasNew,
         received: hasReceived && !hasNew,
-        served: hasServed && !hasNew && !hasReceived,
+        preparing: hasPreparing,
+        ready: hasReady,
+        served: hasServed && !hasNew && !hasReceived && !hasPreparing && !hasReady,
         since: oldestSince
       };
     });

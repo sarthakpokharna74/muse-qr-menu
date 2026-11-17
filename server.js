@@ -6,6 +6,7 @@ const { URL } = require('node:url');
 const { initDb, db } = require('./db');
 const { handleAuth, parseCookies } = require('./routes/auth');
 const { handleAdmin } = require('./routes/admin');
+const { handleKitchen } = require('./routes/kitchen');
 const { handleCustomer } = require('./routes/customer');
 const { getLanIp } = require('./utils');
 
@@ -141,12 +142,22 @@ async function handleRequest(req, res) {
     if (handled !== false) return;
   }
 
+  if (pathname.startsWith('/api/kitchen/')) {
+    const handled = handleKitchen(req, res, pathname, query, db);
+    if (handled !== false) return;
+  }
+
   if (pathname.startsWith('/api/customer/')) {
     const handled = handleCustomer(req, res, pathname, query, db);
     if (handled !== false) return;
   }
 
   // 3. Frontend Page Routes
+  // Kitchen Display System / Chef Panel
+  if (pathname === '/kitchen' || pathname === '/chef' || pathname === '/kds') {
+    return serveFile(res, path.join(PUBLIC_DIR, 'kitchen.html'));
+  }
+
   // Admin SPA
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));

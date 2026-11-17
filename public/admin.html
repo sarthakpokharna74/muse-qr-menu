@@ -99,6 +99,11 @@
   <!-- Floating Waiter & Bill Alerts Container -->
   <div id="adminAlertsBannerHost"></div>
 
+  <!-- Floating Shortcut to Kitchen Display System -->
+  <a href="/kitchen" target="_blank" id="adminKitchenShortcut" style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; background: #0f172a; color: #f8fafc; border: 1.5px solid #334155; padding: 10px 18px; border-radius: 50px; font-weight: 700; font-size: 0.88rem; text-decoration: none; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+    <span>👨‍🍳</span> Kitchen Display (Chef Panel) ↗
+  </a>
+
   <script type="module" src="/assets/index-DEbz15yT.js"></script>
 
   <!-- UNIFIED AUDIO & REAL-TIME ALERTS ENGINE -->
@@ -206,6 +211,12 @@
           strikes = [
             { freq: 1318.51, time: 0.0, gain: vol, decay: 1.1 },
             { freq: 987.77, time: 0.25, gain: vol, decay: 1.5 }
+          ];
+        } else if (type === 'ready') {
+          strikes = [
+            { freq: 1318.51, time: 0.0, gain: vol, decay: 1.0 },
+            { freq: 1567.98, time: 0.15, gain: vol, decay: 1.0 },
+            { freq: 2093.00, time: 0.35, gain: vol, decay: 1.8 }
           ];
         } else {
           strikes = [
@@ -337,16 +348,32 @@
       }
 
       // Render Waiter & Bill Alerts Banner
-      function renderTableAlerts(calls) {
+      // Render Waiter & Bill Alerts Banner + Food Ready Alerts
+      function renderTableAlerts(calls = [], readyOrders = []) {
         const host = document.getElementById('adminAlertsBannerHost');
         if (!host) return;
 
-        if (!calls || !calls.length) {
+        if ((!calls || !calls.length) && (!readyOrders || !readyOrders.length)) {
           host.innerHTML = '';
           return;
         }
 
-        host.innerHTML = calls.map(c => {
+        const readyHtml = (readyOrders || []).map(r => `
+          <div class="admin-table-alert type-ready" style="border-left: 6px solid #10b981; background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);">
+            <div class="alert-content">
+              <div class="alert-emoji">🍳</div>
+              <div>
+                <div class="alert-title">TABLE ${r.table_number}: FOOD COOKED & READY!</div>
+                <div class="alert-sub">Order #${r.number} is prepared by kitchen! Ready to serve · ${formatTimeAgo(r.updated_at)}</div>
+              </div>
+            </div>
+            <button type="button" class="alert-ack-btn" style="background: #10b981; color: #fff;" onclick="window.markOrderServed(${r.id})">
+              🍽️ Mark Served
+            </button>
+          </div>
+        `).join('');
+
+        const callsHtml = (calls || []).map(c => {
           const isWaiter = c.type === 'waiter';
           return `
             <div class="admin-table-alert ${isWaiter ? 'type-waiter' : 'type-bill'}" data-call-id="${c.id}">
@@ -363,7 +390,23 @@
             </div>
           `;
         }).join('');
+
+        host.innerHTML = readyHtml + callsHtml;
       }
+
+      // Mark Order Served directly from Food Ready alert
+      window.markOrderServed = async function (id) {
+        try {
+          await fetch('/api/admin/orders/' + id + '/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'served' })
+          });
+          pollAlertsImmediately();
+        } catch (e) {
+          console.error('Error marking order served:', e);
+        }
+      };
 
       // Dismiss Waiter Call
       window.dismissWaiterCall = async function (id) {
@@ -377,32 +420,44 @@
       };
 
       // Poll Alerts
+      let knownReadyIds = new Set();
       async function pollAlertsImmediately() {
         try {
           const res = await fetch('/api/admin/waiter-calls');
           if (res.ok) {
             const data = await res.json();
             const calls = data.calls || [];
+            const readyOrders = data.readyOrders || [];
 
-            let hasNewCall = false;
+            let hasNewAlert = false;
             let newestType = 'order';
 
+            // Check waiter calls
             calls.forEach(c => {
               if (!knownCallIds.has(c.id)) {
                 knownCallIds.add(c.id);
-                hasNewCall = true;
+                hasNewAlert = true;
                 newestType = c.type || 'waiter';
               }
             });
 
-            if (hasNewCall) {
+            // Check ready orders from kitchen
+            readyOrders.forEach(r => {
+              if (!knownReadyIds.has(r.id)) {
+                knownReadyIds.add(r.id);
+                hasNewAlert = true;
+                newestType = 'ready';
+              }
+            });
+
+            if (hasNewAlert) {
               window.playAlertSound(newestType);
-            } else if (calls.length > 0 && Date.now() - lastReminderTime > 15000) {
+            } else if ((calls.length > 0 || readyOrders.length > 0) && Date.now() - lastReminderTime > 15000) {
               lastReminderTime = Date.now();
-              window.playAlertSound(calls[0].type || 'waiter');
+              window.playAlertSound(readyOrders.length ? 'ready' : (calls[0].type || 'waiter'));
             }
 
-            renderTableAlerts(calls);
+            renderTableAlerts(calls, readyOrders);
           }
         } catch {}
       }
