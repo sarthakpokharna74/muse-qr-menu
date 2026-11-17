@@ -13,6 +13,38 @@ function parseCookies(header = '') {
   return list;
 }
 
+function normalizeBase64(str) {
+  if (!str) return '';
+  return str.replace(/-/g, '+').replace(/_/g, '/').replace(/=/g, '');
+}
+
+function getStoredCredentials(getSetting) {
+  const raw = getSetting('webauthn_credentials');
+  let list = [];
+  if (raw) {
+    try {
+      list = JSON.parse(raw);
+    } catch {}
+  }
+  // Check legacy single key
+  const legacy = getSetting('webauthn_credential_id');
+  if (legacy && !list.some(c => normalizeBase64(c.id) === normalizeBase64(legacy))) {
+    list.push({ id: legacy, name: getSetting('webauthn_name', 'Default Device'), created_at: new Date().toISOString() });
+  }
+  return list;
+}
+
+function saveStoredCredentials(setSetting, list) {
+  setSetting('webauthn_credentials', JSON.stringify(list));
+  if (list.length > 0) {
+    setSetting('webauthn_credential_id', list[list.length - 1].id);
+    setSetting('webauthn_name', list[list.length - 1].name || 'Device Biometrics');
+  } else {
+    setSetting('webauthn_credential_id', '');
+    setSetting('webauthn_name', '');
+  }
+}
+
 function handleAuth(req, res, pathname, db, sessions) {
   const getSetting = (key, fallback = '') => {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -32,13 +64,16 @@ function handleAuth(req, res, pathname, db, sessions) {
     const lockMinutes = Number(getSetting('lock_minutes', '15'));
     const adminHash = getSetting('admin_password_hash');
     const hasAdmin = Boolean(adminHash);
-    const hasBiometrics = Boolean(getSetting('webauthn_credential_id'));
+    const credList = getStoredCredentials(getSetting);
+    const hasBiometrics = credList.length > 0;
+    const credentialIds = credList.map(c => c.id);
 
     if (session && session.user) {
       return res.json({
         loggedIn: true,
         hasAdmin: true,
         hasBiometrics,
+        credentials: credentialIds,
         user: { username: session.user.username },
         cafeName,
         lockMinutes
@@ -49,6 +84,7 @@ function handleAuth(req, res, pathname, db, sessions) {
       loggedIn: false,
       hasAdmin,
       hasBiometrics,
+      credentials: credentialIds,
       cafeName
     });
   }
@@ -140,22 +176,88 @@ function handleAuth(req, res, pathname, db, sessions) {
     if (!credential_id) {
       return res.status(400).json({ error: 'Credential ID is required.' });
     }
-    setSetting('webauthn_credential_id', credential_id);
+
+    const list = getStoredCredentials(getSetting);
+    const normId = normalizeBase64(credential_id);
+    const existingIdx = list.findIndex(c => normalizeBase64(c.id) === normId);
+    const credObj = {
+      id: credential_id,
+      name: credential_name || 'Device Biometrics',
+      created_at: new Date().toISOString()
+    };
+    if (existingIdx >= 0) {
+      list[existingIdx] = credObj;
+    } else {
+      list.push(credObj);
+    }
+
+    saveStoredCredentials(setSetting, list);
     setSetting('webauthn_username', session.user.username);
-    setSetting('webauthn_name', credential_name || 'Device Biometrics');
-    return res.json({ ok: true, message: 'Biometric login successfully registered.' });
+    return res.json({ ok: true, message: 'Biometric login successfully registered.', credentials: list });
+  }
+
+  // 1b. Quick Register Biometrics (using Manager PIN 1234 or Admin Password)
+  if (req.method === 'POST' && pathname === '/api/auth/webauthn/quick-register') {
+    const { credential_id, credential_name, pin, password } = req.body || {};
+    if (!credential_id) {
+      return res.status(400).json({ error: 'Credential ID is required.' });
+    }
+
+    const storedPin = getSetting('manager_pin', '1234');
+    const storedUsername = getSetting('admin_username', 'admin');
+    const storedHash = getSetting('admin_password_hash');
+
+    let authorized = false;
+    if (pin && String(pin).trim() === String(storedPin).trim()) {
+      authorized = true;
+    } else if (password && hashSecret(password) === storedHash) {
+      authorized = true;
+    } else if (session && session.user) {
+      authorized = true;
+    }
+
+    if (!authorized) {
+      return res.status(401).json({ error: 'Incorrect Manager PIN or password to register biometrics.' });
+    }
+
+    const list = getStoredCredentials(getSetting);
+    const normId = normalizeBase64(credential_id);
+    const existingIdx = list.findIndex(c => normalizeBase64(c.id) === normId);
+    const credObj = {
+      id: credential_id,
+      name: credential_name || 'Device Biometrics',
+      created_at: new Date().toISOString()
+    };
+    if (existingIdx >= 0) {
+      list[existingIdx] = credObj;
+    } else {
+      list.push(credObj);
+    }
+
+    saveStoredCredentials(setSetting, list);
+    setSetting('webauthn_username', storedUsername);
+
+    const newSessionId = crypto.randomBytes(24).toString('hex');
+    sessions.set(newSessionId, { user: { username: storedUsername }, createdAt: Date.now() });
+
+    res.setHeader('Set-Cookie', `muse_session=${newSessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
+    return res.json({ ok: true, user: { username: storedUsername }, message: 'Biometrics registered and logged in.' });
   }
 
   // 2. Login with Biometrics
   if (req.method === 'POST' && pathname === '/api/auth/webauthn/login') {
     const { credential_id } = req.body || {};
-    const storedCredId = getSetting('webauthn_credential_id');
+    const list = getStoredCredentials(getSetting);
     const storedUsername = getSetting('webauthn_username', getSetting('admin_username', 'admin'));
 
-    if (!storedCredId) {
-      return res.status(400).json({ error: 'No biometrics registered on this system. Please log in with password first.' });
+    if (list.length === 0) {
+      return res.status(400).json({ error: 'No biometrics registered on this system yet. Please log in with password or PIN first.' });
     }
-    if (!credential_id || credential_id !== storedCredId) {
+
+    const normTarget = normalizeBase64(credential_id);
+    const matched = list.some(c => normalizeBase64(c.id) === normTarget);
+
+    if (!matched) {
       return res.status(401).json({ error: 'Biometric verification failed. Please try again or use password.' });
     }
 
@@ -171,9 +273,8 @@ function handleAuth(req, res, pathname, db, sessions) {
     if (!session || !session.user) {
       return res.status(401).json({ error: 'Must be logged in.' });
     }
-    setSetting('webauthn_credential_id', '');
-    setSetting('webauthn_name', '');
-    return res.json({ ok: true, message: 'Biometric login removed.' });
+    saveStoredCredentials(setSetting, []);
+    return res.json({ ok: true, message: 'All biometric credentials removed.' });
   }
 
   return false; // Not handled

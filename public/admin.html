@@ -608,37 +608,118 @@
             }
           }
 
-          // Biometric Verification Handler
+          // Biometric Verification Handler (Self-Healing & Multi-Device)
           if (bioBtn) {
             bioBtn.addEventListener('click', async () => {
+              if (!window.isSecureContext) {
+                errMsg.textContent = 'ℹ️ Biometrics requires HTTPS. Use the cloud link or enter 4-digit PIN.';
+                pinInput.focus();
+                return;
+              }
               try {
                 bioBtn.disabled = true;
-                bioBtn.textContent = 'Scanning biometrics…';
+                errMsg.textContent = '';
                 const chall = new Uint8Array(32);
                 window.crypto.getRandomValues(chall);
-                const credId = localStorage.getItem('muse_biometric_id');
-                const opt = {
-                  publicKey: {
-                    challenge: chall,
-                    userVerification: 'preferred',
-                    timeout: 60000
-                  }
-                };
-                if (credId) {
+
+                let credId = localStorage.getItem('muse_biometric_id');
+
+                // If not in localStorage, check if server has authorized credentials
+                let serverCreds = [];
+                if (!credId) {
                   try {
-                    const bin = atob(credId);
-                    const arr = new Uint8Array(bin.length);
-                    for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
-                    opt.publicKey.allowCredentials = [{ type: 'public-key', id: arr }];
+                    const stRes = await fetch('/api/auth/state');
+                    if (stRes.ok) {
+                      const st = await stRes.json();
+                      serverCreds = st.credentials || [];
+                    }
                   } catch {}
                 }
-                const assertion = await navigator.credentials.get(opt);
-                if (assertion) {
+
+                // If a credential exists either locally or on the server, attempt verification
+                if (credId || serverCreds.length > 0) {
+                  bioBtn.textContent = 'Touch sensor…';
+                  const opt = {
+                    publicKey: {
+                      challenge: chall,
+                      userVerification: 'preferred',
+                      timeout: 60000
+                    }
+                  };
+                  const allowList = [];
+                  if (credId) {
+                    try {
+                      const bin = atob(credId.replace(/-/g, '+').replace(/_/g, '/'));
+                      const arr = new Uint8Array(bin.length);
+                      for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+                      allowList.push({ type: 'public-key', id: arr });
+                    } catch {}
+                  }
+                  serverCreds.forEach(c => {
+                    try {
+                      const bin = atob(c.replace(/-/g, '+').replace(/_/g, '/'));
+                      const arr = new Uint8Array(bin.length);
+                      for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+                      allowList.push({ type: 'public-key', id: arr });
+                    } catch {}
+                  });
+
+                  if (allowList.length > 0) {
+                    opt.publicKey.allowCredentials = allowList;
+                  }
+
+                  try {
+                    const assertion = await navigator.credentials.get(opt);
+                    if (assertion) {
+                      const rawId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)));
+                      localStorage.setItem('muse_biometric_id', rawId);
+                      cleanup(true);
+                      return;
+                    }
+                  } catch (getErr) {
+                    if (getErr.name === 'NotAllowedError') {
+                      errMsg.textContent = 'Scan canceled. Enter 4-digit PIN.';
+                      return;
+                    }
+                    console.warn('Get failed, trying registration fallback:', getErr);
+                  }
+                }
+
+                // If not registered yet on this device, register on fingerprint touch!
+                bioBtn.textContent = 'Touch sensor to register this device…';
+                const uId = new Uint8Array(16);
+                window.crypto.getRandomValues(uId);
+                const newCred = await navigator.credentials.create({
+                  publicKey: {
+                    challenge: chall,
+                    rp: { name: 'Muse Management' },
+                    user: { id: uId, name: 'admin', displayName: 'Manager' },
+                    pubKeyCredParams: [
+                      { type: 'public-key', alg: -7 },
+                      { type: 'public-key', alg: -257 },
+                      { type: 'public-key', alg: -8 }
+                    ],
+                    authenticatorSelection: {
+                      authenticatorAttachment: 'platform',
+                      userVerification: 'preferred'
+                    },
+                    timeout: 60000
+                  }
+                });
+
+                if (newCred) {
+                  const rawId = btoa(String.fromCharCode(...new Uint8Array(newCred.rawId)));
+                  localStorage.setItem('muse_biometric_id', rawId);
+                  await fetch('/api/auth/webauthn/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential_id: rawId, credential_name: navigator.userAgent.slice(0, 30) })
+                  }).catch(() => {});
                   cleanup(true);
                   return;
                 }
               } catch (err) {
-                errMsg.textContent = err.name === 'NotAllowedError' ? 'Scan canceled.' : 'Biometrics failed: ' + err.message;
+                errMsg.textContent = err.name === 'NotAllowedError' ? 'Scan canceled. Enter 4-digit PIN.' : 'Biometrics: ' + err.message;
               } finally {
                 bioBtn.disabled = false;
                 bioBtn.innerHTML = '<span>👆</span> Verify with Fingerprint / Face ID';
@@ -647,6 +728,151 @@
           }
         });
       };
+
+      // Universal Biometric Login Enhancer for Sign-in Page
+      async function enhanceLoginScreen() {
+        if (!window.isSecureContext || !window.PublicKeyCredential) return;
+
+        const form = document.querySelector('form.signin');
+        if (!form) return;
+
+        let existingBtn = form.querySelector('button[type="button"].btn');
+        if (!existingBtn) {
+          try {
+            const stRes = await fetch('/api/auth/state');
+            const st = await stRes.json();
+
+            if (!document.getElementById('enhancedBioLoginBtn')) {
+              const bioContainer = document.createElement('div');
+              bioContainer.id = 'enhancedBioLoginContainer';
+              bioContainer.style.cssText = 'margin:12px 0 16px;width:100%;';
+              bioContainer.innerHTML = `
+                <button type="button" id="enhancedBioLoginBtn" style="width:100%;background:#166534;color:#fff;border:none;border-radius:12px;padding:13px;font-size:0.95rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 4px 12px rgba(22,101,52,0.3);transition:transform 0.15s;">
+                  <span>👆</span> Sign in with Fingerprint / Face ID
+                </button>
+                <div style="text-align:center;margin:10px 0 4px;font-size:0.8rem;color:#888;">— or enter user ID & password —</div>
+              `;
+              const heading = form.querySelector('p.muted') || form.querySelector('h1');
+              if (heading && heading.parentNode) {
+                heading.parentNode.insertBefore(bioContainer, heading.nextSibling);
+              }
+
+              document.getElementById('enhancedBioLoginBtn').addEventListener('click', async () => {
+                const btn = document.getElementById('enhancedBioLoginBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span>🔄</span> Scanning Fingerprint / Face ID…';
+                try {
+                  const chall = new Uint8Array(32);
+                  window.crypto.getRandomValues(chall);
+
+                  const credId = localStorage.getItem('muse_biometric_id');
+                  const allowList = [];
+                  if (credId) {
+                    try {
+                      const bin = atob(credId.replace(/-/g, '+').replace(/_/g, '/'));
+                      const arr = new Uint8Array(bin.length);
+                      for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+                      allowList.push({ type: 'public-key', id: arr });
+                    } catch {}
+                  }
+                  (st.credentials || []).forEach(c => {
+                    try {
+                      const bin = atob(c.replace(/-/g, '+').replace(/_/g, '/'));
+                      const arr = new Uint8Array(bin.length);
+                      for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+                      allowList.push({ type: 'public-key', id: arr });
+                    } catch {}
+                  });
+
+                  if (allowList.length > 0) {
+                    const opt = {
+                      publicKey: {
+                        challenge: chall,
+                        allowCredentials: allowList,
+                        userVerification: 'preferred',
+                        timeout: 60000
+                      }
+                    };
+                    const assertion = await navigator.credentials.get(opt);
+                    if (assertion) {
+                      const rawId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)));
+                      localStorage.setItem('muse_biometric_id', rawId);
+                      const loginRes = await fetch('/api/auth/webauthn/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ credential_id: rawId })
+                      });
+                      if (loginRes.ok) {
+                        window.location.reload();
+                        return;
+                      }
+                    }
+                  }
+
+                  // Quick register on this device with PIN
+                  const pin = prompt('First time using Fingerprint / Face ID on this device.\nEnter Manager PIN (default: 1234) to link this device:');
+                  if (!pin) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>👆</span> Sign in with Fingerprint / Face ID';
+                    return;
+                  }
+
+                  btn.innerHTML = '<span>👆</span> Touch sensor to register…';
+                  const uId = new Uint8Array(16);
+                  window.crypto.getRandomValues(uId);
+                  const newCred = await navigator.credentials.create({
+                    publicKey: {
+                      challenge: chall,
+                      rp: { name: 'Muse Management' },
+                      user: { id: uId, name: 'admin', displayName: 'Manager' },
+                      pubKeyCredParams: [
+                        { type: 'public-key', alg: -7 },
+                        { type: 'public-key', alg: -257 },
+                        { type: 'public-key', alg: -8 }
+                      ],
+                      authenticatorSelection: {
+                        authenticatorAttachment: 'platform',
+                        userVerification: 'preferred'
+                      },
+                      timeout: 60000
+                    }
+                  });
+
+                  if (newCred) {
+                    const rawId = btoa(String.fromCharCode(...new Uint8Array(newCred.rawId)));
+                    localStorage.setItem('muse_biometric_id', rawId);
+                    const qRes = await fetch('/api/auth/webauthn/quick-register', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        credential_id: rawId,
+                        credential_name: navigator.userAgent.slice(0, 30),
+                        pin: pin.trim()
+                      })
+                    });
+                    if (qRes.ok) {
+                      window.location.reload();
+                      return;
+                    } else {
+                      const qErr = await qRes.json().catch(() => ({}));
+                      alert(qErr.error || 'Failed to register biometrics with entered PIN.');
+                    }
+                  }
+                } catch (e) {
+                  if (e.name !== 'NotAllowedError') {
+                    alert('Biometric sign-in note: ' + e.message);
+                  }
+                } finally {
+                  btn.disabled = false;
+                  btn.innerHTML = '<span>👆</span> Sign in with Fingerprint / Face ID';
+                }
+              });
+            }
+          } catch {}
+        }
+      }
+
+      setInterval(enhanceLoginScreen, 800);
 
       // Start polling
       setInterval(checkPulse, 1500);
