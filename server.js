@@ -12,6 +12,15 @@ const { getLanIp } = require('./utils');
 // Initialize SQLite database
 initDb();
 
+if (process.env.RENDER_EXTERNAL_URL) {
+  try {
+    db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(process.env.RENDER_EXTERNAL_URL, 'customer_url');
+    console.log(`🌐 Public URL configured from Render: ${process.env.RENDER_EXTERNAL_URL}`);
+  } catch (err) {
+    console.warn('Could not auto-set RENDER_EXTERNAL_URL in settings:', err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
